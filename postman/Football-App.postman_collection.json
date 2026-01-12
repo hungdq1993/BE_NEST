@@ -1,0 +1,890 @@
+{
+  "info": {
+    "name": "Football App - Complete API",
+    "description": "Complete API collection for Football Fund Management System\n\nHướng dẫn sử dụng:\n1. Chạy 'Login' request trước để lấy token\n2. Token sẽ tự động được lưu vào biến {{accessToken}}\n3. Các request khác sẽ tự động sử dụng token này",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
+    { "key": "accessToken", "value": "", "type": "string" },
+    { "key": "userId", "value": "", "type": "string" },
+    { "key": "matchId", "value": "", "type": "string" },
+    { "key": "expenseId", "value": "", "type": "string" },
+    { "key": "monthlyFeeId", "value": "", "type": "string" },
+    { "key": "penaltyId", "value": "", "type": "string" },
+    { "key": "matchPaymentId", "value": "", "type": "string" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "1. Auth",
+      "description": "Authentication APIs",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.tokens) { pm.collectionVariables.set('accessToken', jsonData.tokens.accessToken); }",
+                  "if (jsonData.user) { pm.collectionVariables.set('userId', jsonData.user.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Register",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"admin123\",\n  \"name\": \"Admin User\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"your_refresh_token_here\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "refresh"]
+            }
+          }
+        },
+        {
+          "name": "Firebase Login",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idToken\": \"firebase_id_token_here\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/firebase",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "firebase"]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Users",
+      "description": "User Management APIs (Admin only)",
+      "item": [
+        {
+          "name": "Create User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.id) { pm.collectionVariables.set('userId', jsonData.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"player1@example.com\",\n  \"password\": \"123456\",\n  \"name\": \"Nguyen Van A\",\n  \"skillLevel\": 7,\n  \"role\": \"member\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"]
+            }
+          }
+        },
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"]
+            }
+          }
+        },
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me"]
+            }
+          }
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Nguyen Van A Updated\",\n  \"skillLevel\": 8\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Matches",
+      "description": "Match Management APIs",
+      "item": [
+        {
+          "name": "Create Match",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.id) { pm.collectionVariables.set('matchId', jsonData.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"matchDate\": \"2026-01-15T18:00:00.000Z\",\n  \"location\": \"Sân A1 - Cầu Giấy\",\n  \"matchFee\": 50000,\n  \"notes\": \"Trận đấu tuần này\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/matches",
+              "host": ["{{baseUrl}}"],
+              "path": ["matches"]
+            }
+          }
+        },
+        {
+          "name": "Get All Matches",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/matches",
+              "host": ["{{baseUrl}}"],
+              "path": ["matches"]
+            }
+          }
+        },
+        {
+          "name": "Get Matches by Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/matches?status=scheduled",
+              "host": ["{{baseUrl}}"],
+              "path": ["matches"],
+              "query": [{ "key": "status", "value": "scheduled" }]
+            }
+          }
+        },
+        {
+          "name": "Get Match Detail",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/matches/{{matchId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["matches", "{{matchId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get User Match History",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/matches/user/{{userId}}/history",
+              "host": ["{{baseUrl}}"],
+              "path": ["matches", "user", "{{userId}}", "history"]
+            }
+          }
+        },
+        {
+          "name": "Split Teams",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerIds\": [\"userId1\", \"userId2\", \"userId3\", \"userId4\", \"userId5\", \"userId6\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/matches/{{matchId}}/split-teams",
+              "host": ["{{baseUrl}}"],
+              "path": ["matches", "{{matchId}}", "split-teams"]
+            }
+          }
+        },
+        {
+          "name": "Update Match Result",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"teamAScore\": 3,\n  \"teamBScore\": 2\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/matches/{{matchId}}/result",
+              "host": ["{{baseUrl}}"],
+              "path": ["matches", "{{matchId}}", "result"]
+            }
+          }
+        },
+        {
+          "name": "Cancel Match",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/matches/{{matchId}}/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["matches", "{{matchId}}", "cancel"]
+            }
+          }
+        },
+        {
+          "name": "Delete Match",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/matches/{{matchId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["matches", "{{matchId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Funds - Summary",
+      "description": "Fund Summary & Statistics APIs",
+      "item": [
+        {
+          "name": "Get Fund Summary (Thu-Chi)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/funds/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "summary"]
+            }
+          }
+        },
+        {
+          "name": "Get Fund Stats",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/funds/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Get User Fund Summary",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/funds/user-summary/{{userId}}?userName=Nguyen Van A",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "user-summary", "{{userId}}"],
+              "query": [{ "key": "userName", "value": "Nguyen Van A" }]
+            }
+          }
+        },
+        {
+          "name": "Get User Debt Detail (Chi tiết nợ)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/funds/user-debt/{{userId}}?userName=Nguyen Van A",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "user-debt", "{{userId}}"],
+              "query": [{ "key": "userName", "value": "Nguyen Van A" }]
+            }
+          }
+        },
+        {
+          "name": "Get Match Detail with Payments",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/funds/matches/{{matchId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "matches", "{{matchId}}"]
+            }
+          }
+        },
+        {
+          "name": "Process Losing Team Payments",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/funds/matches/{{matchId}}/process-losing-team",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "matches", "{{matchId}}", "process-losing-team"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Funds - Expenses (Chi tiêu)",
+      "description": "Expense Management APIs",
+      "item": [
+        {
+          "name": "Create Expense",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.id) { pm.collectionVariables.set('expenseId', jsonData.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Thuê sân ngày 15/01\",\n  \"amount\": 500000,\n  \"category\": \"field_rental\",\n  \"date\": \"2026-01-15\",\n  \"note\": \"Sân A1 - 2 tiếng\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/funds/expenses",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "expenses"]
+            }
+          }
+        },
+        {
+          "name": "Create Expense - Drinks",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Nước uống trận 15/01\",\n  \"amount\": 100000,\n  \"category\": \"drinks\",\n  \"date\": \"2026-01-15\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/funds/expenses",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "expenses"]
+            }
+          }
+        },
+        {
+          "name": "Create Expense - Equipment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Mua bóng mới\",\n  \"amount\": 300000,\n  \"category\": \"equipment\",\n  \"date\": \"2026-01-10\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/funds/expenses",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "expenses"]
+            }
+          }
+        },
+        {
+          "name": "Get All Expenses",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/funds/expenses",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "expenses"]
+            }
+          }
+        },
+        {
+          "name": "Get Expenses by Date Range",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/funds/expenses?startDate=2026-01-01&endDate=2026-01-31&category=field_rental",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "expenses"],
+              "query": [
+                { "key": "startDate", "value": "2026-01-01" },
+                { "key": "endDate", "value": "2026-01-31" },
+                { "key": "category", "value": "field_rental", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Expense",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 550000,\n  \"note\": \"Đã cập nhật giá\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/funds/expenses/{{expenseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "expenses", "{{expenseId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Expense",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/funds/expenses/{{expenseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "expenses", "{{expenseId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Funds - Monthly Fees (Tiền tháng)",
+      "description": "Monthly Fee Management APIs",
+      "item": [
+        {
+          "name": "Create Monthly Fee",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.id) { pm.collectionVariables.set('monthlyFeeId', jsonData.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"month\": 1,\n  \"year\": 2026,\n  \"amount\": 200000,\n  \"note\": \"Tiền tháng 1/2026\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/funds/monthly-fees",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "monthly-fees"]
+            }
+          }
+        },
+        {
+          "name": "Get All Monthly Fees",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/funds/monthly-fees",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "monthly-fees"]
+            }
+          }
+        },
+        {
+          "name": "Get Unpaid Monthly Fees",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/funds/monthly-fees/unpaid",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "monthly-fees", "unpaid"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Create Monthly Fees (Tạo cho tất cả users)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (Array.isArray(jsonData) && jsonData.length > 0) {",
+                  "  pm.collectionVariables.set('monthlyFeeId', jsonData[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"month\": 1,\n  \"year\": 2026,\n  \"amount\": 200000,\n  \"note\": \"Tiền tháng 1/2026\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/funds/monthly-fees/bulk",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "monthly-fees", "bulk"]
+            }
+          }
+        },
+        {
+          "name": "Get Monthly Fees by Period",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/funds/monthly-fees/period?month=1&year=2026",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "monthly-fees", "period"],
+              "query": [
+                { "key": "month", "value": "1" },
+                { "key": "year", "value": "2026" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Monthly Fee Period Status (Đã/Chưa thanh toán)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/funds/monthly-fees/period/status?month=1&year=2026",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "monthly-fees", "period", "status"],
+              "query": [
+                { "key": "month", "value": "1" },
+                { "key": "year", "value": "2026" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mark Monthly Fee Paid",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/funds/monthly-fees/{{monthlyFeeId}}/pay",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "monthly-fees", "{{monthlyFeeId}}", "pay"]
+            }
+          }
+        },
+        {
+          "name": "Delete Monthly Fee",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/funds/monthly-fees/{{monthlyFeeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "monthly-fees", "{{monthlyFeeId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Funds - Match Payments (Tiền trận)",
+      "description": "Match Payment Management APIs",
+      "item": [
+        {
+          "name": "Create Match Payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.id) { pm.collectionVariables.set('matchPaymentId', jsonData.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"matchId\": \"{{matchId}}\",\n  \"amount\": 50000,\n  \"isPaid\": false,\n  \"note\": \"Tiền thua trận\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/funds/match-payments",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "match-payments"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Create Match Payments",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"matchId\": \"{{matchId}}\",\n  \"players\": [\n    {\"userId\": \"userId1\", \"amount\": 50000, \"isPaid\": false},\n    {\"userId\": \"userId2\", \"amount\": 50000, \"isPaid\": false},\n    {\"userId\": \"userId3\", \"amount\": 50000, \"isPaid\": true}\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/funds/match-payments/bulk",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "match-payments", "bulk"]
+            }
+          }
+        },
+        {
+          "name": "Get All Match Payments",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/funds/match-payments",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "match-payments"]
+            }
+          }
+        },
+        {
+          "name": "Get Unpaid Match Payments",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/funds/match-payments/unpaid",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "match-payments", "unpaid"]
+            }
+          }
+        },
+        {
+          "name": "Get Match Payments by Match",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/funds/match-payments/match/{{matchId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "match-payments", "match", "{{matchId}}"]
+            }
+          }
+        },
+        {
+          "name": "Mark Match Payment Paid",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/funds/match-payments/{{matchPaymentId}}/pay",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "match-payments", "{{matchPaymentId}}", "pay"]
+            }
+          }
+        },
+        {
+          "name": "Delete Match Payment",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/funds/match-payments/{{matchPaymentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "match-payments", "{{matchPaymentId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Funds - Penalties (Tiền phạt)",
+      "description": "Penalty Management APIs",
+      "item": [
+        {
+          "name": "Create Penalty",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.id) { pm.collectionVariables.set('penaltyId', jsonData.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"matchId\": \"{{matchId}}\",\n  \"amount\": 50000,\n  \"reason\": \"late\",\n  \"description\": \"Đến muộn 15 phút\",\n  \"isPaid\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/funds/penalties",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "penalties"]
+            }
+          }
+        },
+        {
+          "name": "Create Penalty - Absent",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"matchId\": \"{{matchId}}\",\n  \"amount\": 100000,\n  \"reason\": \"absent\",\n  \"description\": \"Vắng mặt không báo trước\",\n  \"isPaid\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/funds/penalties",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "penalties"]
+            }
+          }
+        },
+        {
+          "name": "Get All Penalties",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/funds/penalties",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "penalties"]
+            }
+          }
+        },
+        {
+          "name": "Get Unpaid Penalties",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/funds/penalties/unpaid",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "penalties", "unpaid"]
+            }
+          }
+        },
+        {
+          "name": "Get Penalties by Match",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/funds/penalties/match/{{matchId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "penalties", "match", "{{matchId}}"]
+            }
+          }
+        },
+        {
+          "name": "Mark Penalty Paid",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/funds/penalties/{{penaltyId}}/pay",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "penalties", "{{penaltyId}}", "pay"]
+            }
+          }
+        },
+        {
+          "name": "Delete Penalty",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/funds/penalties/{{penaltyId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["funds", "penalties", "{{penaltyId}}"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

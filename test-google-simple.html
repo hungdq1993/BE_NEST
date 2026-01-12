@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Google Sign-In Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 16px;
+            background: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #357ae8;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .error {
+            background: #fee;
+            border-left: 4px solid #f44336;
+        }
+        .success {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔥 Google Sign-In Debug Test</h1>
+    <p>Test chỉ Google Sign-in, không gọi backend</p>
+
+    <button onclick="testGoogleSignIn()">Sign in with Google</button>
+    <button onclick="signOutUser()" style="background: #666;">Sign Out</button>
+
+    <div id="result"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import {
+            getAuth,
+            signInWithPopup,
+            GoogleAuthProvider,
+            signOut
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyA03mtIPAYJ6duZB84Pka6doXYA3-zboMk",
+            authDomain: "football-d12b2.firebaseapp.com",
+            projectId: "football-d12b2"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // Make globally available
+        window.testGoogleSignIn = async function() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = '⏳ Signing in...';
+            resultDiv.className = 'result';
+
+            try {
+                const provider = new GoogleAuthProvider();
+                const result = await signInWithPopup(auth, provider);
+
+                // Get user info
+                const user = result.user;
+                const idToken = await user.getIdToken();
+
+                resultDiv.className = 'result success';
+                resultDiv.textContent = `✅ SUCCESS!\n\nUser Info:\n${JSON.stringify({
+                    uid: user.uid,
+                    email: user.email,
+                    displayName: user.displayName,
+                    photoURL: user.photoURL
+                }, null, 2)}\n\nID Token (first 50 chars):\n${idToken.substring(0, 50)}...`;
+
+                console.log('Full ID Token:', idToken);
+
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ ERROR:\n\nCode: ${error.code}\nMessage: ${error.message}\n\nFull error:\n${JSON.stringify(error, null, 2)}`;
+                console.error('Full error:', error);
+            }
+        };
+
+        window.signOutUser = async function() {
+            try {
+                await signOut(auth);
+                document.getElementById('result').textContent = '✅ Signed out';
+                document.getElementById('result').className = 'result success';
+            } catch (error) {
+                console.error('Sign out error:', error);
+            }
+        };
+
+        // Auth state listener
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                console.log('User signed in:', user.email);
+            } else {
+                console.log('User signed out');
+            }
+        });
+    </script>
+</body>
+</html>

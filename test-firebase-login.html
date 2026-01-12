@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Login Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .btn-google {
+            background: #4285f4;
+            color: white;
+        }
+        .btn-google:hover {
+            background: #357ae8;
+        }
+        .btn-email {
+            background: #34a853;
+            color: white;
+        }
+        .btn-email:hover {
+            background: #2d8e47;
+        }
+        .btn-test {
+            background: #ea4335;
+            color: white;
+            margin-top: 20px;
+        }
+        .btn-test:hover {
+            background: #d33426;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #4285f4;
+            display: none;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .result.show {
+            display: block;
+        }
+        .result.error {
+            border-left-color: #ea4335;
+            background: #fee;
+        }
+        .result.success {
+            border-left-color: #34a853;
+            background: #e6f4ea;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 12px;
+        }
+        .user-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8f5e9;
+            border-radius: 4px;
+            display: none;
+        }
+        .user-info.show {
+            display: block;
+        }
+        .divider {
+            margin: 30px 0;
+            border-top: 1px solid #ddd;
+        }
+        .config-section {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border-left: 4px solid #ffc107;
+        }
+        .config-section input {
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .loader {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .loader.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔥 Firebase Login Test</h1>
+        <p class="subtitle">Test Firebase Authentication cho Backend API</p>
+
+        <!-- Configuration Section -->
+        <div class="config-section">
+            <h3>⚙️ Configuration</h3>
+            <label>API URL:</label>
+            <input type="text" id="apiUrl" value="http://localhost:3000/api/auth/firebase" placeholder="Backend API URL">
+
+            <label>Firebase Config (Project ID):</label>
+            <input type="text" id="firebaseProjectId" placeholder="your-project-id" value="football-d12b2">
+
+            <label>Firebase API Key:</label>
+            <input type="text" id="firebaseApiKey" placeholder="Your web API key from Firebase Console" value="AIzaSyA03mtIPAYJ6duZB84Pka6doXYA3-zboMk">
+
+            <small style="color: #666;">
+                💡 Lấy API Key: Firebase Console → Project Settings → General → Web API Key
+            </small>
+        </div>
+
+        <!-- User Info Display -->
+        <div id="userInfo" class="user-info">
+            <h3>👤 Current User</h3>
+            <p id="userName"></p>
+            <p id="userEmail"></p>
+            <button onclick="logout()" style="background: #666; color: white; padding: 8px 16px; width: auto;">Logout</button>
+        </div>
+
+        <!-- Login Methods -->
+        <button class="btn-google" onclick="loginWithGoogle()">
+            Login with Google
+        </button>
+
+        <div class="divider"></div>
+
+        <h3>📧 Login with Email (Recommended for testing)</h3>
+        <input type="email" id="email" placeholder="Email" value="test@example.com">
+        <input type="password" id="password" placeholder="Password" value="Test123456!">
+        <button class="btn-email" onclick="loginWithEmail()">
+            Login with Email
+        </button>
+
+        <div class="divider"></div>
+
+        <!-- Manual ID Token Test -->
+        <h3>🔧 Manual Test (Advanced)</h3>
+        <input type="text" id="idToken" placeholder="Paste Firebase ID Token here">
+        <button class="btn-test" onclick="testBackendLogin()">
+            Test Backend API
+        </button>
+
+        <!-- Loader -->
+        <div id="loader" class="loader">
+            <p>⏳ Processing...</p>
+        </div>
+
+        <!-- Result Display -->
+        <div id="result" class="result"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import {
+            getAuth,
+            signInWithPopup,
+            signInWithEmailAndPassword,
+            GoogleAuthProvider,
+            signOut
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+        let auth = null;
+        let firebaseApp = null;
+
+        // Initialize Firebase when config changes
+        window.initializeFirebase = function() {
+            const projectId = document.getElementById('firebaseProjectId').value;
+            const apiKey = document.getElementById('firebaseApiKey').value;
+
+            if (!projectId || !apiKey) {
+                showResult('error', '⚠️ Please fill in Firebase Project ID and API Key');
+                return false;
+            }
+
+            try {
+                const firebaseConfig = {
+                    apiKey: apiKey,
+                    authDomain: `${projectId}.firebaseapp.com`,
+                    projectId: projectId
+                };
+
+                firebaseApp = initializeApp(firebaseConfig);
+                auth = getAuth(firebaseApp);
+
+                // Listen to auth state changes
+                auth.onAuthStateChanged((user) => {
+                    if (user) {
+                        document.getElementById('userInfo').classList.add('show');
+                        document.getElementById('userName').textContent = `Name: ${user.displayName || 'N/A'}`;
+                        document.getElementById('userEmail').textContent = `Email: ${user.email}`;
+                    } else {
+                        document.getElementById('userInfo').classList.remove('show');
+                    }
+                });
+
+                return true;
+            } catch (error) {
+                showResult('error', `Firebase initialization failed: ${error.message}`);
+                return false;
+            }
+        };
+
+        // Login with Google
+        window.loginWithGoogle = async function() {
+            if (!auth && !initializeFirebase()) return;
+
+            const provider = new GoogleAuthProvider();
+            showLoader(true);
+
+            try {
+                const result = await signInWithPopup(auth, provider);
+                const idToken = await result.user.getIdToken();
+
+                showResult('success', `✅ Google login successful!\nUser: ${result.user.email}\n\nID Token obtained. Testing backend...`);
+
+                // Auto test backend
+                await callBackendAPI(idToken);
+            } catch (error) {
+                showResult('error', `❌ Google login failed:\n${error.message}`);
+            } finally {
+                showLoader(false);
+            }
+        };
+
+        // Login with Email/Password
+        window.loginWithEmail = async function() {
+            if (!auth && !initializeFirebase()) return;
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            if (!email || !password) {
+                showResult('error', '⚠️ Please enter email and password');
+                return;
+            }
+
+            showLoader(true);
+
+            try {
+                const result = await signInWithEmailAndPassword(auth, email, password);
+                const idToken = await result.user.getIdToken();
+
+                showResult('success', `✅ Email login successful!\nUser: ${result.user.email}\n\nID Token obtained. Testing backend...`);
+
+                // Auto test backend
+                await callBackendAPI(idToken);
+            } catch (error) {
+                showResult('error', `❌ Email login failed:\n${error.message}\n\nNote: You may need to create this user in Firebase Console first.`);
+            } finally {
+                showLoader(false);
+            }
+        };
+
+        // Logout
+        window.logout = async function() {
+            if (auth) {
+                await signOut(auth);
+                showResult('success', '✅ Logged out successfully');
+            }
+        };
+
+        // Manual backend test
+        window.testBackendLogin = async function() {
+            const idToken = document.getElementById('idToken').value;
+
+            if (!idToken) {
+                showResult('error', '⚠️ Please paste an ID Token');
+                return;
+            }
+
+            showLoader(true);
+            await callBackendAPI(idToken);
+            showLoader(false);
+        };
+
+        // Call Backend API
+        async function callBackendAPI(idToken) {
+            const apiUrl = document.getElementById('apiUrl').value;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ idToken })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showResult('success', `✅ Backend API Success!\n\n${JSON.stringify(data, null, 2)}`);
+                } else {
+                    showResult('error', `❌ Backend API Error (${response.status}):\n\n${JSON.stringify(data, null, 2)}`);
+                }
+            } catch (error) {
+                showResult('error', `❌ Backend API Request Failed:\n${error.message}\n\nMake sure your backend is running on ${apiUrl}`);
+            }
+        }
+
+        // Helper functions
+        function showResult(type, message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = `result show ${type}`;
+            resultDiv.innerHTML = `<pre>${message}</pre>`;
+        }
+
+        function showLoader(show) {
+            const loader = document.getElementById('loader');
+            if (show) {
+                loader.classList.add('show');
+            } else {
+                loader.classList.remove('show');
+            }
+        }
+
+        // Make functions globally available
+        window.showResult = showResult;
+    </script>
+</body>
+</html>

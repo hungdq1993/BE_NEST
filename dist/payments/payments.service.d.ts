@@ -1,0 +1,37 @@
+import { PaymentsRepository } from './payments.repository.js';
+import { VnpayService } from './providers/vnpay.service.js';
+import { MomoService } from './providers/momo.service.js';
+import { VietQrService } from './providers/vietqr.service.js';
+import { CassoService } from './providers/casso.service.js';
+import { CreatePaymentDto } from './dto/create-payment.dto.js';
+import { VnpayCallbackDto, MomoCallbackDto, CassoWebhookDto } from './dto/payment-callback.dto.js';
+import { PaymentResponseDto, PaymentUrlResponseDto, PaymentSummaryDto } from './dto/payment-response.dto.js';
+import { BankTransferResponseDto } from './dto/bank-transfer-response.dto.js';
+import { AdminConfirmPaymentDto } from './dto/admin-confirm-payment.dto.js';
+import { ConfigService } from '@nestjs/config';
+export declare class PaymentsService {
+    private readonly paymentsRepository;
+    private readonly vnpayService;
+    private readonly momoService;
+    private readonly vietQrService;
+    private readonly cassoService;
+    private readonly configService;
+    private readonly logger;
+    private readonly returnUrl;
+    private readonly notifyUrl;
+    constructor(paymentsRepository: PaymentsRepository, vnpayService: VnpayService, momoService: MomoService, vietQrService: VietQrService, cassoService: CassoService, configService: ConfigService);
+    create(createDto: CreatePaymentDto): Promise<PaymentResponseDto>;
+    findAll(): Promise<PaymentResponseDto[]>;
+    findById(id: string): Promise<PaymentResponseDto>;
+    findByUser(userId: string): Promise<PaymentResponseDto[]>;
+    createVnpayPayment(paymentId: string, ipAddr: string): Promise<PaymentUrlResponseDto>;
+    createMomoPayment(paymentId: string): Promise<PaymentUrlResponseDto>;
+    handleVnpayCallback(callback: VnpayCallbackDto): Promise<PaymentResponseDto>;
+    handleMomoCallback(callback: MomoCallbackDto): Promise<PaymentResponseDto>;
+    getUserSummary(userId: string): Promise<PaymentSummaryDto>;
+    cancelPayment(id: string): Promise<PaymentResponseDto>;
+    createBankTransferPayment(paymentId: string): Promise<BankTransferResponseDto>;
+    handleCassoWebhook(webhook: CassoWebhookDto): Promise<PaymentResponseDto>;
+    adminConfirmPayment(paymentId: string, confirmDto: AdminConfirmPaymentDto): Promise<PaymentResponseDto>;
+    private toResponseDto;
+}
