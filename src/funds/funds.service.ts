@@ -301,24 +301,29 @@ export class FundsService {
     month: number,
     year: number,
   ): Promise<MonthlyFeePeriodStatusDto> {
-    // Lấy tất cả users
-    const allUsers = await this.usersService.findAll();
-
     // Lấy tất cả monthly fees của period này
     const fees = await this.fundsRepository.findMonthlyFeesByPeriod(month, year);
+
+    // Nếu chưa tạo đợt thanh toán (không có fee records), trả về empty
+    if (fees.length === 0) {
+      return {
+        month,
+        year,
+        totalUsers: 0,
+        paidUsers: [],
+        unpaidUsers: [],
+        totalAmount: 0,
+        paidAmount: 0,
+        unpaidAmount: 0,
+        totalUnpaidAllMonths: 0,
+      };
+    }
 
     // Lấy tổng tiền chưa thu của tất cả các tháng trong năm hiện tại
     const unpaidFeesInYear = await this.fundsRepository.findUnpaidMonthlyFeesByYear(year);
     const totalUnpaidAllMonths = unpaidFeesInYear.reduce((sum, fee) => sum + fee.amount, 0);
 
-    // Tạo map fee theo userId để dễ lookup
-    const feeMap = new Map<string, MonthlyFeeDocument>();
-    fees.forEach((fee) => {
-      const userId = extractUserId(fee.user);
-      feeMap.set(userId, fee);
-    });
-
-    // Phân loại users đã/chưa thanh toán
+    // Phân loại users đã/chưa thanh toán - CHỈ dựa trên fees có sẵn
     const paidUsers: MonthlyFeePeriodStatusDto['paidUsers'] = [];
     const unpaidUsers: MonthlyFeePeriodStatusDto['unpaidUsers'] = [];
 
@@ -326,25 +331,17 @@ export class FundsService {
     let paidAmount = 0;
     let unpaidAmount = 0;
 
-    for (const user of allUsers) {
-      const fee = feeMap.get(user.id);
-
-      if (!fee) {
-        // Chưa có fee cho user này
-        unpaidUsers.push({
-          userId: user.id,
-          userName: user.name,
-          amount: 0, // Chưa tạo fee
-        });
-        continue;
-      }
+    // Duyệt qua các fee records đã được tạo (chỉ tính users trong đợt thanh toán)
+    for (const fee of fees) {
+      const userId = extractUserId(fee.user);
+      const userName = extractUserName(fee.user) || 'Unknown';
 
       totalAmount += fee.amount;
 
       if (fee.isPaid) {
         paidUsers.push({
-          userId: user.id,
-          userName: extractUserName(fee.user) || user.name,
+          userId,
+          userName,
           feeId: fee._id.toString(),
           amount: fee.amount,
           paidAt: fee.paidAt || fee.updatedAt,
@@ -352,8 +349,8 @@ export class FundsService {
         paidAmount += fee.amount;
       } else {
         unpaidUsers.push({
-          userId: user.id,
-          userName: extractUserName(fee.user) || user.name,
+          userId,
+          userName,
           feeId: fee._id.toString(),
           amount: fee.amount,
         });
@@ -364,7 +361,7 @@ export class FundsService {
     return {
       month,
       year,
-      totalUsers: allUsers.length,
+      totalUsers: fees.length, // Tổng số users TRONG đợt thanh toán
       paidUsers,
       unpaidUsers,
       totalAmount,

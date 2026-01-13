@@ -174,35 +174,35 @@ let FundsService = class FundsService {
         return fees.map((f) => this.toMonthlyFeeResponseDto(f));
     }
     async getMonthlyFeePeriodStatus(month, year) {
-        const allUsers = await this.usersService.findAll();
         const fees = await this.fundsRepository.findMonthlyFeesByPeriod(month, year);
+        if (fees.length === 0) {
+            return {
+                month,
+                year,
+                totalUsers: 0,
+                paidUsers: [],
+                unpaidUsers: [],
+                totalAmount: 0,
+                paidAmount: 0,
+                unpaidAmount: 0,
+                totalUnpaidAllMonths: 0,
+            };
+        }
         const unpaidFeesInYear = await this.fundsRepository.findUnpaidMonthlyFeesByYear(year);
         const totalUnpaidAllMonths = unpaidFeesInYear.reduce((sum, fee) => sum + fee.amount, 0);
-        const feeMap = new Map();
-        fees.forEach((fee) => {
-            const userId = extractUserId(fee.user);
-            feeMap.set(userId, fee);
-        });
         const paidUsers = [];
         const unpaidUsers = [];
         let totalAmount = 0;
         let paidAmount = 0;
         let unpaidAmount = 0;
-        for (const user of allUsers) {
-            const fee = feeMap.get(user.id);
-            if (!fee) {
-                unpaidUsers.push({
-                    userId: user.id,
-                    userName: user.name,
-                    amount: 0,
-                });
-                continue;
-            }
+        for (const fee of fees) {
+            const userId = extractUserId(fee.user);
+            const userName = extractUserName(fee.user) || 'Unknown';
             totalAmount += fee.amount;
             if (fee.isPaid) {
                 paidUsers.push({
-                    userId: user.id,
-                    userName: extractUserName(fee.user) || user.name,
+                    userId,
+                    userName,
                     feeId: fee._id.toString(),
                     amount: fee.amount,
                     paidAt: fee.paidAt || fee.updatedAt,
@@ -211,8 +211,8 @@ let FundsService = class FundsService {
             }
             else {
                 unpaidUsers.push({
-                    userId: user.id,
-                    userName: extractUserName(fee.user) || user.name,
+                    userId,
+                    userName,
                     feeId: fee._id.toString(),
                     amount: fee.amount,
                 });
@@ -222,7 +222,7 @@ let FundsService = class FundsService {
         return {
             month,
             year,
-            totalUsers: allUsers.length,
+            totalUsers: fees.length,
             paidUsers,
             unpaidUsers,
             totalAmount,
