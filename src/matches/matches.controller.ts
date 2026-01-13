@@ -65,6 +65,22 @@ export class MatchesController {
     return this.matchesService.findMatchHistoryByUser(userId);
   }
 
+  // Preview team split without saving
+  @Post('preview-split')
+  @Roles(Role.ADMIN)
+  async previewSplitTeams(
+    @Body() splitDto: SplitTeamDto,
+  ): Promise<{
+    teamA: { id: string; name: string; skillLevel: number }[];
+    teamB: { id: string; name: string; skillLevel: number }[];
+    teamASkill: number;
+    teamBSkill: number;
+    skillDifference: number;
+    balanceScore: number;
+  }> {
+    return this.matchesService.previewSplitTeams(splitDto);
+  }
+
   // ==================== ADMIN ONLY APIs ====================
 
   @Post()

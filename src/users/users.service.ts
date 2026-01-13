@@ -98,6 +98,8 @@ export class UsersService {
           ...this.toResponseDto(user),
           totalDebt,
           totalPaid,
+          unpaidMonthlyFees: fundSummary.monthlyFees.pending, // Nợ tiền tháng
+          unpaidMatchFees: fundSummary.matchPayments.pending, // Nợ tiền trận (thua)
           matchesWon,
           matchesLost,
           matchesDraw,

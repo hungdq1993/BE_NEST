@@ -16,6 +16,8 @@ export class UserWithStatsResponseDto extends UserResponseDto {
   // Financial stats
   totalDebt: number; // Tổng nợ (chưa đóng)
   totalPaid: number; // Tổng đã đóng
+  unpaidMonthlyFees: number; // Tổng nợ tiền tháng chưa đóng
+  unpaidMatchFees: number; // Tổng nợ tiền trận chưa đóng (thua trận)
   
   // Match stats
   matchesWon: number; // Số trận thắng

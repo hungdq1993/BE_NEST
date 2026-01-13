@@ -99,6 +99,12 @@ export class MatchesService {
   }
 
   async cancelMatch(id: string): Promise<MatchResponseDto> {
+    // Xoá tất cả match payments liên quan (vì trận bị huỷ thì không còn nợ)
+    await this.fundsService.deleteMatchPaymentsByMatch(id);
+    
+    // Xoá tất cả penalties liên quan
+    await this.fundsService.deletePenaltiesByMatch(id);
+    
     const match = await this.matchesRepository.updateMatchStatus(
       id,
       MatchStatus.CANCELLED,
@@ -110,7 +116,16 @@ export class MatchesService {
   }
 
   async deleteMatch(id: string): Promise<void> {
+    // Xoá tất cả match payments liên quan đến trận đấu này
+    await this.fundsService.deleteMatchPaymentsByMatch(id);
+    
+    // Xoá tất cả penalties liên quan đến trận đấu này
+    await this.fundsService.deletePenaltiesByMatch(id);
+    
+    // Xoá lineups
     await this.matchesRepository.deleteLineupsByMatch(id);
+    
+    // Xoá match
     const match = await this.matchesRepository.deleteMatch(id);
     if (!match) {
       throw new NotFoundException('Match not found');
@@ -143,8 +158,13 @@ export class MatchesService {
       });
     }
 
-    // Split teams
-    const result = this.teamSplitterService.splitTeams(players);
+    // Use advanced splitting algorithm with options
+    const result = await this.teamSplitterService.splitTeamsAdvanced(players, {
+      useHistory: splitDto.useHistory ?? false,
+      avoidFrequentTeammates: splitDto.avoidFrequentTeammates ?? false,
+      balancePositions: splitDto.balancePositions ?? false,
+      maxSkillDifference: splitDto.maxSkillDifference ?? 10,
+    });
 
     // Save lineups
     await this.matchesRepository.deleteLineupsByMatch(matchId);
@@ -298,5 +318,43 @@ export class MatchesService {
         isWinner,
       };
     });
+  }
+
+  // Preview team split without saving (for admin to review before confirming)
+  async previewSplitTeams(splitDto: SplitTeamDto): Promise<{
+    teamA: { id: string; name: string; skillLevel: number }[];
+    teamB: { id: string; name: string; skillLevel: number }[];
+    teamASkill: number;
+    teamBSkill: number;
+    skillDifference: number;
+    balanceScore: number;
+  }> {
+    // Get player details
+    const players: PlayerWithSkill[] = [];
+    for (const playerId of splitDto.playerIds) {
+      const user = await this.usersService.findById(playerId);
+      players.push({
+        id: playerId,
+        name: user.name,
+        skillLevel: user.skillLevel,
+      });
+    }
+
+    // Use advanced splitting algorithm
+    const result = await this.teamSplitterService.splitTeamsAdvanced(players, {
+      useHistory: splitDto.useHistory ?? false,
+      avoidFrequentTeammates: splitDto.avoidFrequentTeammates ?? false,
+      balancePositions: splitDto.balancePositions ?? false,
+      maxSkillDifference: splitDto.maxSkillDifference ?? 10,
+    });
+
+    return {
+      teamA: result.teamA.map(p => ({ id: p.id, name: p.name, skillLevel: p.skillLevel })),
+      teamB: result.teamB.map(p => ({ id: p.id, name: p.name, skillLevel: p.skillLevel })),
+      teamASkill: result.teamASkill,
+      teamBSkill: result.teamBSkill,
+      skillDifference: result.skillDifference,
+      balanceScore: result.balanceScore,
+    };
   }
 }

@@ -120,6 +120,13 @@ export class FundsRepository {
     return this.matchPaymentModel.findByIdAndDelete(id).exec();
   }
 
+  async deleteMatchPaymentsByMatch(matchId: string): Promise<number> {
+    const result = await this.matchPaymentModel
+      .deleteMany({ match: new Types.ObjectId(matchId) })
+      .exec();
+    return result.deletedCount;
+  }
+
   async getMatchPaymentStats(): Promise<{
     total: number;
     paid: number;
@@ -467,6 +474,13 @@ export class FundsRepository {
 
   async deletePenalty(id: string): Promise<PenaltyDocument | null> {
     return this.penaltyModel.findByIdAndDelete(id).exec();
+  }
+
+  async deletePenaltiesByMatch(matchId: string): Promise<number> {
+    const result = await this.penaltyModel
+      .deleteMany({ match: new Types.ObjectId(matchId) })
+      .exec();
+    return result.deletedCount;
   }
 
   // ==================== AGGREGATION METHODS ====================

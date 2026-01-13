@@ -448,6 +448,14 @@ export class FundsService {
     if (!penalty) throw new NotFoundException('Penalty not found');
   }
 
+  async deletePenaltiesByMatch(matchId: string): Promise<number> {
+    return this.fundsRepository.deletePenaltiesByMatch(matchId);
+  }
+
+  async deleteMatchPaymentsByMatch(matchId: string): Promise<number> {
+    return this.fundsRepository.deleteMatchPaymentsByMatch(matchId);
+  }
+
   // ==================== STATS METHODS ====================
 
   async getFundStats(): Promise<FundStatsDto> {
