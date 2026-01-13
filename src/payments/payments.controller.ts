@@ -37,19 +37,49 @@ import { Public } from '../common/decorators/public.decorator.js';
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
-  @Post()
-  @Roles(Role.ADMIN, Role.CAPTAIN)
-  async create(
-    @Body() createDto: CreatePaymentDto,
-  ): Promise<PaymentResponseDto> {
-    return this.paymentsService.create(createDto);
-  }
+  // ==================== PUBLIC VIEW APIs ====================
 
+  @Public()
   @Get()
-  @Roles(Role.ADMIN, Role.CAPTAIN)
   async findAll(): Promise<PaymentResponseDto[]> {
     return this.paymentsService.findAll();
   }
+
+  @Public()
+  @Get(':id')
+  async findOne(@Param('id') id: string): Promise<PaymentResponseDto> {
+    return this.paymentsService.findById(id);
+  }
+
+  // ==================== WEBHOOK/CALLBACK APIs (External Services) ====================
+
+  @Get('callback/vnpay')
+  @Public()
+  async vnpayCallback(
+    @Query() callback: VnpayCallbackDto,
+  ): Promise<PaymentResponseDto> {
+    return this.paymentsService.handleVnpayCallback(callback);
+  }
+
+  @Post('callback/momo')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async momoCallback(
+    @Body() callback: MomoCallbackDto,
+  ): Promise<PaymentResponseDto> {
+    return this.paymentsService.handleMomoCallback(callback);
+  }
+
+  @Post('webhook/casso')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async cassoWebhook(
+    @Body() webhook: CassoWebhookDto,
+  ): Promise<PaymentResponseDto> {
+    return this.paymentsService.handleCassoWebhook(webhook);
+  }
+
+  // ==================== AUTHENTICATED USER APIs ====================
 
   @Get('my-payments')
   async findMyPayments(
@@ -61,11 +91,6 @@ export class PaymentsController {
   @Get('my-summary')
   async getMySummary(@CurrentUser() user: any): Promise<PaymentSummaryDto> {
     return this.paymentsService.getUserSummary(user.sub);
-  }
-
-  @Get(':id')
-  async findOne(@Param('id') id: string): Promise<PaymentResponseDto> {
-    return this.paymentsService.findById(id);
   }
 
   @Post(':id/vnpay')
@@ -94,30 +119,14 @@ export class PaymentsController {
     return this.paymentsService.createBankTransferPayment(id);
   }
 
-  @Get('callback/vnpay')
-  @Public()
-  async vnpayCallback(
-    @Query() callback: VnpayCallbackDto,
-  ): Promise<PaymentResponseDto> {
-    return this.paymentsService.handleVnpayCallback(callback);
-  }
+  // ==================== ADMIN ONLY APIs ====================
 
-  @Post('callback/momo')
-  @Public()
-  @HttpCode(HttpStatus.OK)
-  async momoCallback(
-    @Body() callback: MomoCallbackDto,
+  @Post()
+  @Roles(Role.ADMIN)
+  async create(
+    @Body() createDto: CreatePaymentDto,
   ): Promise<PaymentResponseDto> {
-    return this.paymentsService.handleMomoCallback(callback);
-  }
-
-  @Post('webhook/casso')
-  @Public()
-  @HttpCode(HttpStatus.OK)
-  async cassoWebhook(
-    @Body() webhook: CassoWebhookDto,
-  ): Promise<PaymentResponseDto> {
-    return this.paymentsService.handleCassoWebhook(webhook);
+    return this.paymentsService.create(createDto);
   }
 
   @Patch(':id/cancel')

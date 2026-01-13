@@ -42,21 +42,151 @@ import {
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { Roles, Role } from '../common/decorators/roles.decorator.js';
+import { Public } from '../common/decorators/public.decorator.js';
 
 @Controller('funds')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class FundsController {
   constructor(private readonly fundsService: FundsService) {}
 
-  // ==================== FUND SUMMARY (BẢNG TỔNG HỢP THU-CHI) ====================
+  // ==================== PUBLIC VIEW APIs ====================
 
+  @Public()
   @Get('summary')
-  @Roles(Role.ADMIN)
   async getFundSummary(): Promise<FundSummaryDto> {
     return this.fundsService.getFundSummary();
   }
 
-  // ==================== MATCH PAYMENT ENDPOINTS (TIỀN ĐÓNG THEO TRẬN) ====================
+  @Public()
+  @Get('match-payments')
+  async findAllMatchPayments(
+    @Query('matchId') matchId?: string,
+  ): Promise<MatchPaymentResponseDto[]> {
+    if (matchId) {
+      return this.fundsService.findMatchPaymentsByMatch(matchId);
+    }
+    return this.fundsService.findAllMatchPayments();
+  }
+
+  @Public()
+  @Get('match-payments/unpaid')
+  async findUnpaidMatchPayments(): Promise<MatchPaymentResponseDto[]> {
+    return this.fundsService.findUnpaidMatchPayments();
+  }
+
+  @Public()
+  @Get('match-payments/match/:matchId')
+  async findMatchPaymentsByMatch(
+    @Param('matchId') matchId: string,
+  ): Promise<MatchPaymentResponseDto[]> {
+    return this.fundsService.findMatchPaymentsByMatch(matchId);
+  }
+
+  @Public()
+  @Get('expenses')
+  async findAllExpenses(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('category') category?: string,
+  ): Promise<ExpenseResponseDto[]> {
+    return this.fundsService.findAllExpenses(startDate, endDate, category);
+  }
+
+  @Public()
+  @Get('monthly-fees')
+  async findAllMonthlyFees(): Promise<MonthlyFeeResponseDto[]> {
+    return this.fundsService.findAllMonthlyFees();
+  }
+
+  @Public()
+  @Get('monthly-fees/unpaid')
+  async findUnpaidMonthlyFees(): Promise<MonthlyFeeResponseDto[]> {
+    return this.fundsService.findUnpaidMonthlyFees();
+  }
+
+  @Public()
+  @Get('monthly-fees/period')
+  async findMonthlyFeesByPeriod(
+    @Query('month') month: number,
+    @Query('year') year: number,
+  ): Promise<MonthlyFeeResponseDto[]> {
+    return this.fundsService.findMonthlyFeesByPeriod(month, year);
+  }
+
+  @Public()
+  @Get('monthly-fees/period/status')
+  async getMonthlyFeePeriodStatus(
+    @Query('month') month: number,
+    @Query('year') year: number,
+  ): Promise<MonthlyFeePeriodStatusDto> {
+    return this.fundsService.getMonthlyFeePeriodStatus(month, year);
+  }
+
+  @Public()
+  @Get('penalties')
+  async findAllPenalties(): Promise<PenaltyResponseDto[]> {
+    return this.fundsService.findAllPenalties();
+  }
+
+  @Public()
+  @Get('penalties/unpaid')
+  async findUnpaidPenalties(): Promise<PenaltyResponseDto[]> {
+    return this.fundsService.findUnpaidPenalties();
+  }
+
+  @Public()
+  @Get('penalties/match/:matchId')
+  async findPenaltiesByMatch(
+    @Param('matchId') matchId: string,
+  ): Promise<PenaltyResponseDto[]> {
+    return this.fundsService.findPenaltiesByMatch(matchId);
+  }
+
+  @Public()
+  @Get('stats')
+  async getFundStats(): Promise<FundStatsDto> {
+    return this.fundsService.getFundStats();
+  }
+
+  @Public()
+  @Get('users-statistics')
+  async getAllUsersStatistics(): Promise<UsersStatisticsDto> {
+    return this.fundsService.getAllUsersStatistics();
+  }
+
+  @Public()
+  @Get('user-summary/:userId')
+  async getUserFundSummary(
+    @Param('userId') userId: string,
+    @Query('userName') userName: string = 'User',
+  ): Promise<UserFundSummaryDto> {
+    return this.fundsService.getUserFundSummary(userId, userName);
+  }
+
+  @Public()
+  @Get('debts')
+  async getAllDebts(): Promise<AllDebtsDto> {
+    return this.fundsService.getAllDebts();
+  }
+
+  @Public()
+  @Get('user-debt/:userId')
+  async getUserDebtDetail(
+    @Param('userId') userId: string,
+    @Query('userName') userName: string = 'User',
+  ): Promise<UserDebtDetailDto> {
+    return this.fundsService.getUserDebtDetail(userId, userName);
+  }
+
+  @Public()
+  @Get('matches/:matchId')
+  async getMatchDetailWithPayments(
+    @Param('matchId') matchId: string,
+  ): Promise<MatchDetailWithPaymentsDto> {
+    return await this.fundsService.getMatchDetailWithPayments(matchId);
+  }
+
+  // ==================== ADMIN ONLY APIs ====================
 
   @Post('match-payments')
   @Roles(Role.ADMIN)
@@ -74,31 +204,6 @@ export class FundsController {
     return this.fundsService.bulkCreateMatchPayments(dto);
   }
 
-  @Get('match-payments')
-  @Roles(Role.ADMIN)
-  async findAllMatchPayments(
-    @Query('matchId') matchId?: string,
-  ): Promise<MatchPaymentResponseDto[]> {
-    if (matchId) {
-      return this.fundsService.findMatchPaymentsByMatch(matchId);
-    }
-    return this.fundsService.findAllMatchPayments();
-  }
-
-  @Get('match-payments/unpaid')
-  @Roles(Role.ADMIN)
-  async findUnpaidMatchPayments(): Promise<MatchPaymentResponseDto[]> {
-    return this.fundsService.findUnpaidMatchPayments();
-  }
-
-  @Get('match-payments/match/:matchId')
-  @Roles(Role.ADMIN)
-  async findMatchPaymentsByMatch(
-    @Param('matchId') matchId: string,
-  ): Promise<MatchPaymentResponseDto[]> {
-    return this.fundsService.findMatchPaymentsByMatch(matchId);
-  }
-
   @Patch('match-payments/:id/pay')
   @Roles(Role.ADMIN)
   async markMatchPaymentPaid(
@@ -114,24 +219,12 @@ export class FundsController {
     return this.fundsService.deleteMatchPayment(id);
   }
 
-  // ==================== EXPENSE ENDPOINTS (CHI TIÊU) ====================
-
   @Post('expenses')
   @Roles(Role.ADMIN)
   async createExpense(
     @Body() dto: CreateExpenseDto,
   ): Promise<ExpenseResponseDto> {
     return this.fundsService.createExpense(dto);
-  }
-
-  @Get('expenses')
-  @Roles(Role.ADMIN)
-  async findAllExpenses(
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('category') category?: string,
-  ): Promise<ExpenseResponseDto[]> {
-    return this.fundsService.findAllExpenses(startDate, endDate, category);
   }
 
   @Put('expenses/:id')
@@ -150,8 +243,6 @@ export class FundsController {
     return this.fundsService.deleteExpense(id);
   }
 
-  // ==================== MONTHLY FEE ENDPOINTS (TIỀN THÁNG) ====================
-
   @Post('monthly-fees')
   @Roles(Role.ADMIN)
   async createMonthlyFee(
@@ -168,36 +259,6 @@ export class FundsController {
     return this.fundsService.bulkCreateMonthlyFees(dto);
   }
 
-  @Get('monthly-fees')
-  @Roles(Role.ADMIN)
-  async findAllMonthlyFees(): Promise<MonthlyFeeResponseDto[]> {
-    return this.fundsService.findAllMonthlyFees();
-  }
-
-  @Get('monthly-fees/unpaid')
-  @Roles(Role.ADMIN)
-  async findUnpaidMonthlyFees(): Promise<MonthlyFeeResponseDto[]> {
-    return this.fundsService.findUnpaidMonthlyFees();
-  }
-
-  @Get('monthly-fees/period')
-  @Roles(Role.ADMIN)
-  async findMonthlyFeesByPeriod(
-    @Query('month') month: number,
-    @Query('year') year: number,
-  ): Promise<MonthlyFeeResponseDto[]> {
-    return this.fundsService.findMonthlyFeesByPeriod(month, year);
-  }
-
-  @Get('monthly-fees/period/status')
-  @Roles(Role.ADMIN)
-  async getMonthlyFeePeriodStatus(
-    @Query('month') month: number,
-    @Query('year') year: number,
-  ): Promise<MonthlyFeePeriodStatusDto> {
-    return this.fundsService.getMonthlyFeePeriodStatus(month, year);
-  }
-
   @Patch('monthly-fees/:id/pay')
   @Roles(Role.ADMIN)
   async markMonthlyFeePaid(
@@ -206,7 +267,6 @@ export class FundsController {
     return this.fundsService.markMonthlyFeePaid(id);
   }
 
-  // API mới: Tạo và mark paid monthly fee cho user (dùng khi user chưa có fee record)
   @Post('monthly-fees/pay')
   @Roles(Role.ADMIN)
   async createAndPayMonthlyFee(
@@ -222,34 +282,12 @@ export class FundsController {
     return this.fundsService.deleteMonthlyFee(id);
   }
 
-  // ==================== PENALTY ENDPOINTS (TIỀN PHẠT) ====================
-
   @Post('penalties')
   @Roles(Role.ADMIN)
   async createPenalty(
     @Body() dto: CreatePenaltyDto,
   ): Promise<PenaltyResponseDto> {
     return this.fundsService.createPenalty(dto);
-  }
-
-  @Get('penalties')
-  @Roles(Role.ADMIN)
-  async findAllPenalties(): Promise<PenaltyResponseDto[]> {
-    return this.fundsService.findAllPenalties();
-  }
-
-  @Get('penalties/unpaid')
-  @Roles(Role.ADMIN)
-  async findUnpaidPenalties(): Promise<PenaltyResponseDto[]> {
-    return this.fundsService.findUnpaidPenalties();
-  }
-
-  @Get('penalties/match/:matchId')
-  @Roles(Role.ADMIN)
-  async findPenaltiesByMatch(
-    @Param('matchId') matchId: string,
-  ): Promise<PenaltyResponseDto[]> {
-    return this.fundsService.findPenaltiesByMatch(matchId);
   }
 
   @Patch('penalties/:id/pay')
@@ -265,61 +303,11 @@ export class FundsController {
     return this.fundsService.deletePenalty(id);
   }
 
-  // ==================== STATS ENDPOINTS ====================
-
-  @Get('stats')
-  @Roles(Role.ADMIN)
-  async getFundStats(): Promise<FundStatsDto> {
-    return this.fundsService.getFundStats();
-  }
-
-  @Get('users-statistics')
-  @Roles(Role.ADMIN)
-  async getAllUsersStatistics(): Promise<UsersStatisticsDto> {
-    return this.fundsService.getAllUsersStatistics();
-  }
-
-  @Get('user-summary/:userId')
-  @Roles(Role.ADMIN)
-  async getUserFundSummary(
-    @Param('userId') userId: string,
-    @Query('userName') userName: string = 'User',
-  ): Promise<UserFundSummaryDto> {
-    return this.fundsService.getUserFundSummary(userId, userName);
-  }
-
-  @Get('debts')
-  @Roles(Role.ADMIN)
-  async getAllDebts(): Promise<AllDebtsDto> {
-    return this.fundsService.getAllDebts();
-  }
-
-  @Get('user-debt/:userId')
-  @Roles(Role.ADMIN)
-  async getUserDebtDetail(
-    @Param('userId') userId: string,
-    @Query('userName') userName: string = 'User',
-  ): Promise<UserDebtDetailDto> {
-    return this.fundsService.getUserDebtDetail(userId, userName);
-  }
-
-  // ==================== MATCH DETAIL WITH PAYMENTS ====================
-
-  @Get('matches/:matchId')
-  @Roles(Role.ADMIN, Role.CAPTAIN)
-  async getMatchDetailWithPayments(
-    @Param('matchId') matchId: string,
-  ): Promise<MatchDetailWithPaymentsDto> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
-    return await this.fundsService.getMatchDetailWithPayments(matchId);
-  }
-
   @Post('matches/:matchId/process-losing-team')
   @Roles(Role.ADMIN)
   async processLosingTeam(
     @Param('matchId') matchId: string,
   ): Promise<MatchPaymentResponseDto[]> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
     return await this.fundsService.processLosingTeam(matchId);
   }
 }

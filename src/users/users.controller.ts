@@ -19,20 +19,17 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { Roles, Role } from '../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { Public } from '../common/decorators/public.decorator.js';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Post()
-  @Roles(Role.ADMIN)
-  async create(@Body() createUserDto: CreateUserDto): Promise<UserResponseDto> {
-    return this.usersService.create(createUserDto);
-  }
+  // ==================== PUBLIC VIEW APIs ====================
 
+  @Public()
   @Get()
-  @Roles(Role.ADMIN, Role.CAPTAIN)
   async findAll(
     @Query('withStats') withStats?: string,
   ): Promise<UserResponseDto[] | UserWithStatsResponseDto[]> {
@@ -42,26 +39,19 @@ export class UsersController {
     return this.usersService.findAll();
   }
 
+  @Public()
+  @Get(':id')
+  async findOne(@Param('id') id: string): Promise<UserResponseDto> {
+    return this.usersService.findById(id);
+  }
+
+  // ==================== AUTHENTICATED USER APIs ====================
+
   @Get('me')
   async getProfile(
     @CurrentUser() user: { sub: string },
   ): Promise<UserResponseDto> {
     return this.usersService.findById(user.sub);
-  }
-
-  @Get(':id')
-  @Roles(Role.ADMIN, Role.CAPTAIN)
-  async findOne(@Param('id') id: string): Promise<UserResponseDto> {
-    return this.usersService.findById(id);
-  }
-
-  @Patch(':id')
-  @Roles(Role.ADMIN)
-  async update(
-    @Param('id') id: string,
-    @Body() updateUserDto: UpdateUserDto,
-  ): Promise<UserResponseDto> {
-    return this.usersService.update(id, updateUserDto);
   }
 
   @Patch('me')
@@ -72,6 +62,23 @@ export class UsersController {
     // Users can only update their own profile (limited fields)
     const { ...allowedUpdates } = updateUserDto;
     return this.usersService.update(user.sub, allowedUpdates as UpdateUserDto);
+  }
+
+  // ==================== ADMIN ONLY APIs ====================
+
+  @Post()
+  @Roles(Role.ADMIN)
+  async create(@Body() createUserDto: CreateUserDto): Promise<UserResponseDto> {
+    return this.usersService.create(createUserDto);
+  }
+
+  @Patch(':id')
+  @Roles(Role.ADMIN)
+  async update(
+    @Param('id') id: string,
+    @Body() updateUserDto: UpdateUserDto,
+  ): Promise<UserResponseDto> {
+    return this.usersService.update(id, updateUserDto);
   }
 
   @Delete(':id')

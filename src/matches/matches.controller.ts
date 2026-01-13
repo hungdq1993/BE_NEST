@@ -22,6 +22,7 @@ import {
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { Roles, Role } from '../common/decorators/roles.decorator.js';
+import { Public } from '../common/decorators/public.decorator.js';
 import { MatchStatus } from './schemas/match.schema.js';
 
 @Controller('matches')
@@ -29,14 +30,9 @@ import { MatchStatus } from './schemas/match.schema.js';
 export class MatchesController {
   constructor(private readonly matchesService: MatchesService) {}
 
-  @Post()
-  @Roles(Role.ADMIN, Role.CAPTAIN)
-  async createMatch(
-    @Body() createDto: CreateMatchDto,
-  ): Promise<MatchResponseDto> {
-    return this.matchesService.createMatch(createDto);
-  }
+  // ==================== PUBLIC VIEW APIs ====================
 
+  @Public()
   @Get()
   async findAllMatches(
     @Query('status') status?: MatchStatus,
@@ -47,44 +43,14 @@ export class MatchesController {
     return this.matchesService.findAllMatches();
   }
 
+  @Public()
   @Get(':id')
   async findMatch(@Param('id') id: string): Promise<MatchWithLineupsDto> {
     return this.matchesService.findMatchById(id);
   }
 
-  @Patch(':id/result')
-  @Roles(Role.ADMIN, Role.CAPTAIN)
-  async updateResult(
-    @Param('id') id: string,
-    @Body() updateDto: UpdateMatchResultDto,
-  ): Promise<MatchResponseDto> {
-    return this.matchesService.updateMatchResult(id, updateDto);
-  }
-
-  @Patch(':id/cancel')
-  @Roles(Role.ADMIN, Role.CAPTAIN)
-  async cancelMatch(@Param('id') id: string): Promise<MatchResponseDto> {
-    return this.matchesService.cancelMatch(id);
-  }
-
-  @Delete(':id')
-  @Roles(Role.ADMIN)
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteMatch(@Param('id') id: string): Promise<void> {
-    return this.matchesService.deleteMatch(id);
-  }
-
-  @Post(':id/split-teams')
-  @Roles(Role.ADMIN, Role.CAPTAIN)
-  async splitTeams(
-    @Param('id') id: string,
-    @Body() splitDto: SplitTeamDto,
-  ): Promise<MatchWithLineupsDto> {
-    return this.matchesService.splitTeams(id, splitDto);
-  }
-
+  @Public()
   @Get('user/:userId/history')
-  @Roles(Role.ADMIN, Role.CAPTAIN)
   async findMatchHistoryByUser(@Param('userId') userId: string): Promise<
     {
       id: string;
@@ -97,5 +63,46 @@ export class MatchesController {
     }[]
   > {
     return this.matchesService.findMatchHistoryByUser(userId);
+  }
+
+  // ==================== ADMIN ONLY APIs ====================
+
+  @Post()
+  @Roles(Role.ADMIN)
+  async createMatch(
+    @Body() createDto: CreateMatchDto,
+  ): Promise<MatchResponseDto> {
+    return this.matchesService.createMatch(createDto);
+  }
+
+  @Patch(':id/result')
+  @Roles(Role.ADMIN)
+  async updateResult(
+    @Param('id') id: string,
+    @Body() updateDto: UpdateMatchResultDto,
+  ): Promise<MatchResponseDto> {
+    return this.matchesService.updateMatchResult(id, updateDto);
+  }
+
+  @Patch(':id/cancel')
+  @Roles(Role.ADMIN)
+  async cancelMatch(@Param('id') id: string): Promise<MatchResponseDto> {
+    return this.matchesService.cancelMatch(id);
+  }
+
+  @Delete(':id')
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteMatch(@Param('id') id: string): Promise<void> {
+    return this.matchesService.deleteMatch(id);
+  }
+
+  @Post(':id/split-teams')
+  @Roles(Role.ADMIN)
+  async splitTeams(
+    @Param('id') id: string,
+    @Body() splitDto: SplitTeamDto,
+  ): Promise<MatchWithLineupsDto> {
+    return this.matchesService.splitTeams(id, splitDto);
   }
 }
