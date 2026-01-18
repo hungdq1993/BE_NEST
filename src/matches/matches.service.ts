@@ -357,4 +357,209 @@ export class MatchesService {
       balanceScore: result.balanceScore,
     };
   }
+
+  // Swap 2 players giữa team A và team B
+  async swapPlayers(
+    matchId: string,
+    playerAId: string,
+    playerBId: string,
+  ): Promise<{
+    message: string;
+    teamA: {
+      players: string[];
+      totalSkillLevel: number;
+    };
+    teamB: {
+      players: string[];
+      totalSkillLevel: number;
+    };
+  }> {
+    // Kiểm tra match tồn tại
+    const match = await this.matchesRepository.findMatchById(matchId);
+    if (!match) {
+      throw new NotFoundException('Match not found');
+    }
+
+    // Kiểm tra match chưa có kết quả (không cho swap sau khi đã có kết quả)
+    if (match.result) {
+      throw new BadRequestException('Cannot swap players after match has result');
+    }
+
+    // Thực hiện swap
+    const { teamA, teamB } = await this.matchesRepository.swapPlayers(
+      matchId,
+      playerAId,
+      playerBId,
+    );
+
+    // Tính lại skill level
+    const teamASkillLevel = teamA.players.reduce((sum, player: any) => {
+      return sum + (player.skillLevel || 0);
+    }, 0);
+
+    const teamBSkillLevel = teamB.players.reduce((sum, player: any) => {
+      return sum + (player.skillLevel || 0);
+    }, 0);
+
+    return {
+      message: 'Players swapped successfully',
+      teamA: {
+        players: teamA.players.map((p: any) => p._id.toString()),
+        totalSkillLevel: teamASkillLevel,
+      },
+      teamB: {
+        players: teamB.players.map((p: any) => p._id.toString()),
+        totalSkillLevel: teamBSkillLevel,
+      },
+    };
+  }
+
+  // Thêm player vào đội
+  async addPlayerToLineup(
+    matchId: string,
+    playerId: string,
+    team: 'A' | 'B',
+  ): Promise<any> {
+    // Kiểm tra match tồn tại
+    const match = await this.matchesRepository.findMatchById(matchId);
+    if (!match) {
+      throw new NotFoundException('Match not found');
+    }
+
+    // Kiểm tra match chưa có kết quả
+    if (match.result) {
+      throw new BadRequestException('Cannot add player after match has result');
+    }
+
+    // Thực hiện thêm player
+    const updatedTeam = await this.matchesRepository.addPlayerToLineup(
+      matchId,
+      playerId,
+      team,
+    );
+
+    // Tính lại skill level
+    const totalSkillLevel = updatedTeam.players.reduce((sum, player: any) => {
+      return sum + (player.skillLevel || 0);
+    }, 0);
+
+    return {
+      message: `Player added to Team ${team} successfully`,
+      team,
+      players: updatedTeam.players.map((p: any) => ({
+        id: p._id.toString(),
+        name: p.name,
+        skillLevel: p.skillLevel,
+      })),
+      totalSkillLevel,
+    };
+  }
+
+  // Xóa player khỏi đội
+  async removePlayerFromLineup(matchId: string, playerId: string): Promise<any> {
+    // Kiểm tra match tồn tại
+    const match = await this.matchesRepository.findMatchById(matchId);
+    if (!match) {
+      throw new NotFoundException('Match not found');
+    }
+
+    // Kiểm tra match chưa có kết quả
+    if (match.result) {
+      throw new BadRequestException(
+        'Cannot remove player after match has result',
+      );
+    }
+
+    // Thực hiện xóa player
+    const { teamA, teamB, removedFrom } =
+      await this.matchesRepository.removePlayerFromLineup(matchId, playerId);
+
+    if (!removedFrom || !teamA || !teamB) {
+      throw new NotFoundException('Player not found in any team');
+    }
+
+    // Tính lại skill level
+    const teamASkillLevel = teamA.players.reduce((sum, player: any) => {
+      return sum + (player.skillLevel || 0);
+    }, 0);
+
+    const teamBSkillLevel = teamB.players.reduce((sum, player: any) => {
+      return sum + (player.skillLevel || 0);
+    }, 0);
+
+    return {
+      message: `Player removed from Team ${removedFrom} successfully`,
+      removedFrom,
+      teamA: {
+        players: teamA.players.map((p: any) => ({
+          id: p._id.toString(),
+          name: p.name,
+          skillLevel: p.skillLevel,
+        })),
+        totalSkillLevel: teamASkillLevel,
+      },
+      teamB: {
+        players: teamB.players.map((p: any) => ({
+          id: p._id.toString(),
+          name: p.name,
+          skillLevel: p.skillLevel,
+        })),
+        totalSkillLevel: teamBSkillLevel,
+      },
+    };
+  }
+
+  // Di chuyển player sang đội khác
+  async movePlayer(
+    matchId: string,
+    playerId: string,
+    toTeam: 'A' | 'B',
+  ): Promise<any> {
+    // Kiểm tra match tồn tại
+    const match = await this.matchesRepository.findMatchById(matchId);
+    if (!match) {
+      throw new NotFoundException('Match not found');
+    }
+
+    // Kiểm tra match chưa có kết quả
+    if (match.result) {
+      throw new BadRequestException('Cannot move player after match has result');
+    }
+
+    // Thực hiện di chuyển player
+    const { teamA, teamB } = await this.matchesRepository.movePlayer(
+      matchId,
+      playerId,
+      toTeam,
+    );
+
+    // Tính lại skill level
+    const teamASkillLevel = teamA.players.reduce((sum, player: any) => {
+      return sum + (player.skillLevel || 0);
+    }, 0);
+
+    const teamBSkillLevel = teamB.players.reduce((sum, player: any) => {
+      return sum + (player.skillLevel || 0);
+    }, 0);
+
+    return {
+      message: `Player moved to Team ${toTeam} successfully`,
+      teamA: {
+        players: teamA.players.map((p: any) => ({
+          id: p._id.toString(),
+          name: p.name,
+          skillLevel: p.skillLevel,
+        })),
+        totalSkillLevel: teamASkillLevel,
+      },
+      teamB: {
+        players: teamB.players.map((p: any) => ({
+          id: p._id.toString(),
+          name: p.name,
+          skillLevel: p.skillLevel,
+        })),
+        totalSkillLevel: teamBSkillLevel,
+      },
+    };
+  }
 }

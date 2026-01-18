@@ -108,14 +108,148 @@ export class LeaderboardService {
   }
 
   async getLeaderboard(): Promise<LeaderboardDto> {
-    const users = await this.usersService.findAll();
-    const allStats: PlayerStatsDto[] = [];
+    // Lấy tất cả data cần thiết một lần
+    const [users, allMatches, allLineups] = await Promise.all([
+      this.usersService.findAll(),
+      this.matchesRepository.findAllMatches(),
+      this.matchesRepository.findAllLineups(),
+    ]);
 
-    for (const user of users) {
-      if (!user.isActive) continue;
-      const stats = await this.getPlayerStats(user.id);
-      allStats.push(stats);
+    const activeUsers = users.filter(u => u.isActive);
+
+    // Build lineup map by matchId
+    const lineupsByMatch = new Map<string, { teamA?: any; teamB?: any }>();
+    for (const lineup of allLineups) {
+      const matchId = lineup.match.toString();
+      if (!lineupsByMatch.has(matchId)) {
+        lineupsByMatch.set(matchId, {});
+      }
+      const matchLineups = lineupsByMatch.get(matchId)!;
+      if (lineup.team === 'A') {
+        matchLineups.teamA = lineup;
+      } else {
+        matchLineups.teamB = lineup;
+      }
     }
+
+    // Build match history map cho tất cả users
+    const userMatchHistory = new Map<string, MatchResult[]>();
+    
+    for (const match of allMatches) {
+      if (match.status !== MatchStatus.COMPLETED || !match.result) continue;
+
+      const { teamAScore, teamBScore } = match.result;
+      const matchId = match._id.toString();
+      const lineups = lineupsByMatch.get(matchId);
+      
+      if (!lineups) continue;
+
+      // Process team A players
+      if (lineups.teamA?.players) {
+        for (const player of lineups.teamA.players) {
+          const userId = player._id ? player._id.toString() : player.toString();
+          if (!userMatchHistory.has(userId)) {
+            userMatchHistory.set(userId, []);
+          }
+
+          let result: 'W' | 'L' | 'D';
+          if (teamAScore === teamBScore) result = 'D';
+          else if (teamAScore > teamBScore) result = 'W';
+          else result = 'L';
+
+          userMatchHistory.get(userId)!.push({
+            odId: matchId,
+            odDate: match.matchDate,
+            team: 'A',
+            result,
+            teamAScore,
+            teamBScore,
+          });
+        }
+      }
+
+      // Process team B players
+      if (lineups.teamB?.players) {
+        for (const player of lineups.teamB.players) {
+          const userId = player._id ? player._id.toString() : player.toString();
+          if (!userMatchHistory.has(userId)) {
+            userMatchHistory.set(userId, []);
+          }
+
+          let result: 'W' | 'L' | 'D';
+          if (teamAScore === teamBScore) result = 'D';
+          else if (teamBScore > teamAScore) result = 'W';
+          else result = 'L';
+
+          userMatchHistory.get(userId)!.push({
+            odId: matchId,
+            odDate: match.matchDate,
+            team: 'B',
+            result,
+            teamAScore,
+            teamBScore,
+          });
+        }
+      }
+    }
+
+    // Lấy fund summary cho tất cả users một lần
+    const userFundSummaries = new Map<string, any>();
+    await Promise.all(
+      activeUsers.map(async (user) => {
+        const summary = await this.fundsRepository.getUserFundSummary(user.id);
+        userFundSummaries.set(user.id, summary);
+      })
+    );
+
+    // Calculate stats cho tất cả users
+    const allStats: PlayerStatsDto[] = activeUsers.map(user => {
+      const results = userMatchHistory.get(user.id) || [];
+      results.sort((a, b) => b.odDate.getTime() - a.odDate.getTime());
+
+      let matchesWon = 0;
+      let matchesLost = 0;
+      let matchesDraw = 0;
+
+      for (const r of results) {
+        if (r.result === 'W') matchesWon++;
+        else if (r.result === 'L') matchesLost++;
+        else matchesDraw++;
+      }
+
+      const { currentStreak, longestWinStreak, longestLoseStreak } = this.calculateStreaks(results);
+      const recentForm = results.slice(0, 5).map(r => r.result);
+      const totalMatches = matchesWon + matchesLost + matchesDraw;
+      const winRate = totalMatches > 0 ? Math.round((matchesWon / totalMatches) * 100) : 0;
+
+      const fundSummary = userFundSummaries.get(user.id);
+      const totalPayments = fundSummary ? 
+        fundSummary.monthlyFees.total + fundSummary.penalties.total + fundSummary.matchPayments.total : 0;
+      const paidPayments = fundSummary ?
+        fundSummary.monthlyFees.paid + fundSummary.penalties.paid + fundSummary.matchPayments.paid : 0;
+      const paymentRate = totalPayments > 0 ? Math.round((paidPayments / totalPayments) * 100) : 100;
+      const totalDebt = fundSummary ?
+        fundSummary.monthlyFees.pending + fundSummary.penalties.pending + fundSummary.matchPayments.pending : 0;
+
+      return {
+        userId: user.id,
+        userName: user.name,
+        avatar: user.avatar,
+        skillLevel: user.skillLevel,
+        totalMatches,
+        matchesWon,
+        matchesLost,
+        matchesDraw,
+        winRate,
+        currentStreak,
+        longestWinStreak,
+        longestLoseStreak,
+        recentForm,
+        totalPaid: paidPayments,
+        totalDebt,
+        paymentRate,
+      };
+    });
 
     // By win rate (minimum 5 matches)
     const byWinRate = allStats

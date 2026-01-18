@@ -7,6 +7,7 @@ import {
   Max,
   MinLength,
 } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class MonthlyFeeResponseDto {
   id: string;
@@ -101,24 +102,49 @@ export class UserDebtDetailDto {
 }
 
 export class CreateMonthlyFeeDto {
+  @ApiProperty({
+    description: 'User ID',
+    example: '507f1f77bcf86cd799439011',
+  })
   @IsMongoId()
   @IsString()
   userId: string;
 
+  @ApiProperty({
+    description: 'Tháng (1-12)',
+    example: 1,
+    minimum: 1,
+    maximum: 12,
+  })
   @IsNumber()
   @Min(1)
   @Max(12)
   month: number;
 
+  @ApiProperty({
+    description: 'Năm',
+    example: 2025,
+    minimum: 2000,
+    maximum: 2100,
+  })
   @IsNumber()
   @Min(2000)
   @Max(2100)
   year: number;
 
+  @ApiProperty({
+    description: 'Số tiền (VNĐ)',
+    example: 200000,
+    minimum: 0,
+  })
   @IsNumber()
   @Min(0)
   amount: number;
 
+  @ApiPropertyOptional({
+    description: 'Ghi chú',
+    example: 'Phí tháng 1/2025',
+  })
   @IsString()
   @IsOptional()
   note?: string;
@@ -126,46 +152,93 @@ export class CreateMonthlyFeeDto {
 
 // DTO để tạo và mark paid monthly fee cho user
 export class CreateAndPayMonthlyFeeDto {
+  @ApiProperty({
+    description: 'User ID',
+    example: '507f1f77bcf86cd799439011',
+  })
   @IsMongoId()
   @IsString()
   userId: string;
 
+  @ApiProperty({
+    description: 'Tháng (1-12)',
+    example: 1,
+    minimum: 1,
+    maximum: 12,
+  })
   @IsNumber()
   @Min(1)
   @Max(12)
   month: number;
 
+  @ApiProperty({
+    description: 'Năm',
+    example: 2025,
+    minimum: 2000,
+    maximum: 2100,
+  })
   @IsNumber()
   @Min(2000)
   @Max(2100)
   year: number;
 
+  @ApiProperty({
+    description: 'Số tiền (VNĐ)',
+    example: 200000,
+    minimum: 0,
+  })
   @IsNumber()
   @Min(0)
   amount: number;
 
+  @ApiPropertyOptional({
+    description: 'Ghi chú',
+    example: 'Phí tháng 1/2025',
+  })
   @IsString()
   @IsOptional()
   note?: string;
 }
 
 export class CreatePenaltyDto {
+  @ApiProperty({
+    description: 'User ID',
+    example: '507f1f77bcf86cd799439011',
+  })
   @IsMongoId()
   @IsString()
   userId: string;
 
+  @ApiProperty({
+    description: 'Match ID',
+    example: '507f1f77bcf86cd799439012',
+  })
   @IsMongoId()
   @IsString()
   matchId: string;
 
+  @ApiProperty({
+    description: 'Số tiền phạt (VNĐ)',
+    example: 50000,
+    minimum: 0,
+  })
   @IsNumber()
   @Min(0)
   amount: number;
 
+  @ApiProperty({
+    description: 'Lý do phạt',
+    example: 'Đi trễ',
+    minLength: 1,
+  })
   @IsString()
   @MinLength(1)
   reason: string;
 
+  @ApiPropertyOptional({
+    description: 'Mô tả chi tiết',
+    example: 'Đến muộn 30 phút',
+  })
   @IsString()
   @IsOptional()
   description?: string;
@@ -173,20 +246,51 @@ export class CreatePenaltyDto {
 
 // DTO để tạo monthly fees cho tất cả users
 export class BulkCreateMonthlyFeeDto {
+  @ApiProperty({
+    description: 'Tháng (1-12)',
+    example: 1,
+    minimum: 1,
+    maximum: 12,
+  })
   @IsNumber()
   @Min(1)
   @Max(12)
   month: number;
 
+  @ApiProperty({
+    description: 'Năm',
+    example: 2025,
+    minimum: 2000,
+    maximum: 2100,
+  })
   @IsNumber()
   @Min(2000)
   @Max(2100)
   year: number;
 
+  @ApiProperty({
+    description: 'Số tiền cho người bình thường (VNĐ)',
+    example: 200000,
+    minimum: 0,
+  })
   @IsNumber()
   @Min(0)
-  amount: number;
+  amount: number; // Số tiền cho người bình thường
 
+  @ApiPropertyOptional({
+    description: 'Số tiền cho sinh viên (VNĐ). Nếu không set thì dùng amount',
+    example: 100000,
+    minimum: 0,
+  })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  studentAmount?: number; // Số tiền cho sinh viên (nếu không set thì dùng amount)
+
+  @ApiPropertyOptional({
+    description: 'Ghi chú',
+    example: 'Phí tháng 1/2025',
+  })
   @IsString()
   @IsOptional()
   note?: string;

@@ -46,4 +46,26 @@ export class UsersRepository {
   async findByFirebaseUid(firebaseUid: string): Promise<UserDocument | null> {
     return this.userModel.findOne({ firebaseUid }).exec();
   }
+
+  async bulkUpdateStudentStatus(
+    userIds: string[],
+    isStudent: boolean,
+  ): Promise<UserDocument[]> {
+    await this.userModel.updateMany(
+      { _id: { $in: userIds } },
+      { $set: { isStudent } },
+    );
+    return this.userModel.find({ _id: { $in: userIds } }).exec();
+  }
+
+  async bulkUpdateSkillLevel(
+    userIds: string[],
+    skillLevel: number,
+  ): Promise<UserDocument[]> {
+    await this.userModel.updateMany(
+      { _id: { $in: userIds } },
+      { $set: { skillLevel } },
+    );
+    return this.userModel.find({ _id: { $in: userIds } }).exec();
+  }
 }

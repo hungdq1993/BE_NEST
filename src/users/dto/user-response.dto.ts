@@ -8,6 +8,7 @@ export class UserResponseDto {
   skillLevel: number;
   avatar?: string;
   isActive: boolean;
+  isStudent: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
