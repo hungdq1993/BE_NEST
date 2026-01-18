@@ -54,59 +54,117 @@ export class UsersService {
   }
 
   async findAllWithStats(): Promise<UserWithStatsResponseDto[]> {
-    const users = await this.usersRepository.findAll();
+    // Lấy tất cả data cần thiết một lần
+    const [users, allMatches, allLineups] = await Promise.all([
+      this.usersRepository.findAll(),
+      this.matchesRepository.findAllMatches(),
+      this.matchesRepository.findAllLineups(),
+    ]);
+
+    // Build lineup map by matchId
+    const lineupsByMatch = new Map<string, { teamA?: any; teamB?: any }>();
+    for (const lineup of allLineups) {
+      const matchId = lineup.match.toString();
+      if (!lineupsByMatch.has(matchId)) {
+        lineupsByMatch.set(matchId, {});
+      }
+      const matchLineups = lineupsByMatch.get(matchId)!;
+      if (lineup.team === 'A') {
+        matchLineups.teamA = lineup;
+      } else {
+        matchLineups.teamB = lineup;
+      }
+    }
+
+    // Build match history map cho tất cả users
+    const userMatchHistory = new Map<string, Array<{ match: any; team: 'A' | 'B' }>>();
     
-    const usersWithStats = await Promise.all(
+    for (const match of allMatches) {
+      const matchId = match._id.toString();
+      const lineups = lineupsByMatch.get(matchId);
+      
+      if (!lineups) continue;
+
+      // Process team A players
+      if (lineups.teamA?.players) {
+        for (const player of lineups.teamA.players) {
+          const userId = player._id ? player._id.toString() : player.toString();
+          if (!userMatchHistory.has(userId)) {
+            userMatchHistory.set(userId, []);
+          }
+          userMatchHistory.get(userId)!.push({ match, team: 'A' });
+        }
+      }
+
+      // Process team B players
+      if (lineups.teamB?.players) {
+        for (const player of lineups.teamB.players) {
+          const userId = player._id ? player._id.toString() : player.toString();
+          if (!userMatchHistory.has(userId)) {
+            userMatchHistory.set(userId, []);
+          }
+          userMatchHistory.get(userId)!.push({ match, team: 'B' });
+        }
+      }
+    }
+
+    // Lấy fund summary cho tất cả users song song
+    const userFundSummaries = new Map<string, any>();
+    await Promise.all(
       users.map(async (user) => {
         const userId = user._id.toString();
-        
-        // Lấy thống kê tài chính
-        const fundSummary = await this.fundsRepository.getUserFundSummary(userId);
-        const totalDebt = 
-          fundSummary.monthlyFees.pending + 
-          fundSummary.penalties.pending + 
-          fundSummary.matchPayments.pending;
-        const totalPaid = 
-          fundSummary.monthlyFees.paid + 
-          fundSummary.penalties.paid + 
-          fundSummary.matchPayments.paid;
-        
-        // Lấy lịch sử trận đấu
-        const matchHistory = await this.matchesRepository.findMatchHistoryByUser(userId);
-        
-        let matchesWon = 0;
-        let matchesLost = 0;
-        let matchesDraw = 0;
-        
-        for (const { match, team } of matchHistory) {
-          if (match.result) {
-            const { teamAScore, teamBScore } = match.result;
-            if (teamAScore === teamBScore) {
-              matchesDraw++;
-            } else if (
-              (team === 'A' && teamAScore > teamBScore) ||
-              (team === 'B' && teamBScore > teamAScore)
-            ) {
-              matchesWon++;
-            } else {
-              matchesLost++;
-            }
-          }
-        }
-        
-        return {
-          ...this.toResponseDto(user),
-          totalDebt,
-          totalPaid,
-          unpaidMonthlyFees: fundSummary.monthlyFees.pending, // Nợ tiền tháng
-          unpaidMatchFees: fundSummary.matchPayments.pending, // Nợ tiền trận (thua)
-          matchesWon,
-          matchesLost,
-          matchesDraw,
-          totalMatches: matchHistory.length,
-        };
+        const summary = await this.fundsRepository.getUserFundSummary(userId);
+        userFundSummaries.set(userId, summary);
       })
     );
+
+    // Build response cho từng user
+    const usersWithStats = users.map((user) => {
+      const userId = user._id.toString();
+      const fundSummary = userFundSummaries.get(userId);
+      const matchHistory = userMatchHistory.get(userId) || [];
+      
+      const totalDebt = fundSummary ? 
+        fundSummary.monthlyFees.pending + 
+        fundSummary.penalties.pending + 
+        fundSummary.matchPayments.pending : 0;
+      const totalPaid = fundSummary ?
+        fundSummary.monthlyFees.paid + 
+        fundSummary.penalties.paid + 
+        fundSummary.matchPayments.paid : 0;
+      
+      let matchesWon = 0;
+      let matchesLost = 0;
+      let matchesDraw = 0;
+      
+      for (const { match, team } of matchHistory) {
+        if (match.result) {
+          const { teamAScore, teamBScore } = match.result;
+          if (teamAScore === teamBScore) {
+            matchesDraw++;
+          } else if (
+            (team === 'A' && teamAScore > teamBScore) ||
+            (team === 'B' && teamBScore > teamAScore)
+          ) {
+            matchesWon++;
+          } else {
+            matchesLost++;
+          }
+        }
+      }
+      
+      return {
+        ...this.toResponseDto(user),
+        totalDebt,
+        totalPaid,
+        unpaidMonthlyFees: fundSummary ? fundSummary.monthlyFees.pending : 0,
+        unpaidMatchFees: fundSummary ? fundSummary.matchPayments.pending : 0,
+        matchesWon,
+        matchesLost,
+        matchesDraw,
+        totalMatches: matchHistory.length,
+      };
+    });
     
     return usersWithStats;
   }
@@ -147,6 +205,34 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
+  }
+
+  async bulkUpdateStudentStatus(
+    userIds: string[],
+    isStudent: boolean,
+  ): Promise<{ updated: number; users: UserResponseDto[] }> {
+    const users = await this.usersRepository.bulkUpdateStudentStatus(
+      userIds,
+      isStudent,
+    );
+    return {
+      updated: users.length,
+      users: users.map((user) => this.toResponseDto(user)),
+    };
+  }
+
+  async bulkUpdateSkillLevel(
+    userIds: string[],
+    skillLevel: number,
+  ): Promise<{ updated: number; users: UserResponseDto[] }> {
+    const users = await this.usersRepository.bulkUpdateSkillLevel(
+      userIds,
+      skillLevel,
+    );
+    return {
+      updated: users.length,
+      users: users.map((user) => this.toResponseDto(user)),
+    };
   }
 
   async validateUser(
@@ -201,6 +287,7 @@ export class UsersService {
       skillLevel: user.skillLevel,
       avatar: user.avatar,
       isActive: user.isActive,
+      isStudent: user.isStudent || false,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };

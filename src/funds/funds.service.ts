@@ -186,6 +186,22 @@ export class FundsService {
     return this.toMatchPaymentResponseDto(payment);
   }
 
+  // Đánh dấu đã thanh toán match payments hàng loạt
+  async bulkMarkMatchPaymentPaid(
+    userIds: string[],
+    matchId?: string,
+  ): Promise<{ updated: number; payments: MatchPaymentResponseDto[] }> {
+    const payments = await this.fundsRepository.bulkMarkMatchPaymentPaid(
+      userIds,
+      matchId,
+    );
+
+    return {
+      updated: payments.filter((p) => p.isPaid).length,
+      payments: payments.map((p) => this.toMatchPaymentResponseDto(p)),
+    };
+  }
+
   async deleteMatchPayment(id: string): Promise<void> {
     const payment = await this.fundsRepository.deleteMatchPayment(id);
     if (!payment) throw new NotFoundException('Match payment not found');
@@ -265,10 +281,17 @@ export class FundsService {
       throw new BadRequestException('Không có user nào trong hệ thống');
     }
 
-    // Tạo monthly fees cho tất cả users
+    // Xác định số tiền cho sinh viên
+    const studentAmount = dto.studentAmount ?? dto.amount;
+
+    // Tạo monthly fees cho tất cả users với số tiền tương ứng
     const fees = await this.fundsRepository.bulkCreateMonthlyFees(
       dto,
-      users.map((u) => u.id),
+      users.map((u) => ({
+        userId: u.id,
+        isStudent: u.isStudent || false,
+      })),
+      studentAmount,
     );
 
     return fees.map((f) => this.toMonthlyFeeResponseDto(f));
@@ -380,6 +403,29 @@ export class FundsService {
     const fee = await this.fundsRepository.markMonthlyFeePaid(id);
     if (!fee) throw new NotFoundException('Monthly fee not found');
     return this.toMonthlyFeeResponseDto(fee);
+  }
+
+  // Đánh dấu đã thanh toán hàng loạt
+  async bulkMarkMonthlyFeePaid(
+    userIds: string[],
+    month?: number,
+    year?: number,
+  ): Promise<{ updated: number; fees: MonthlyFeeResponseDto[] }> {
+    // Nếu không truyền month/year thì lấy tháng hiện tại
+    const now = new Date();
+    const targetMonth = month ?? now.getMonth() + 1;
+    const targetYear = year ?? now.getFullYear();
+
+    const fees = await this.fundsRepository.bulkMarkMonthlyFeePaid(
+      userIds,
+      targetMonth,
+      targetYear,
+    );
+
+    return {
+      updated: fees.filter((f) => f.isPaid).length,
+      fees: fees.map((f) => this.toMonthlyFeeResponseDto(f)),
+    };
   }
 
   // Tạo và mark paid monthly fee cho user (dùng khi user chưa có fee record)
@@ -983,5 +1029,297 @@ export class FundsService {
       createdAt: penalty.createdAt,
       updatedAt: penalty.updatedAt,
     };
+  }
+
+  // ==================== ADMIN FUND MANAGEMENT METHODS ====================
+
+  /**
+   * Set the current fund balance
+   * @param dto - SetFundBalanceDto containing amount and optional note
+   * @param adminUserId - The admin user ID who is setting the balance
+   * @returns FundBalanceResponseDto
+   */
+  async setFundBalance(
+    dto: { amount: number; note?: string },
+    adminUserId: string,
+  ): Promise<any> {
+    const balance = await this.fundsRepository.createFundBalance(
+      dto.amount,
+      adminUserId,
+      dto.note,
+    );
+    return this.toFundBalanceResponseDto(balance);
+  }
+
+  /**
+   * Get the current fund balance
+   * @returns FundBalanceResponseDto
+   * @throws NotFoundException if no balance has been set
+   */
+  async getCurrentFundBalance(): Promise<any> {
+    const balance = await this.fundsRepository.getCurrentFundBalance();
+    if (!balance) {
+      throw new NotFoundException('No fund balance has been set');
+    }
+    return this.toFundBalanceResponseDto(balance);
+  }
+
+  /**
+   * Convert FundBalanceDocument to FundBalanceResponseDto
+   */
+  private toFundBalanceResponseDto(balance: any): any {
+    return {
+      id: balance._id.toString(),
+      amount: balance.amount,
+      setBy: extractUserId(balance.setBy),
+      setByName: extractUserName(balance.setBy),
+      note: balance.note,
+      createdAt: balance.createdAt,
+      updatedAt: balance.updatedAt,
+    };
+  }
+
+  // ==================== DEBT DETAILS METHODS ====================
+
+  /**
+   * Lấy chi tiết nợ của tất cả users theo năm
+   */
+  async getDebtDetailsByYear(year?: number): Promise<any> {
+    // Nếu không truyền year thì lấy năm hiện tại
+    const now = new Date();
+    const targetYear = year ?? now.getFullYear();
+
+    // Lấy tất cả monthly fees trong năm
+    const allMonthlyFees = await this.fundsRepository.findMonthlyFeesByYear(targetYear);
+    
+    // Lấy tất cả match payments trong năm
+    const startDate = new Date(targetYear, 0, 1);
+    const endDate = new Date(targetYear, 11, 31, 23, 59, 59);
+    
+    // Lấy tất cả match payments và filter theo matchDate
+    const allMatchPayments = await this.fundsRepository.findAllMatchPayments();
+    const matchPaymentsInYear = allMatchPayments.filter((payment) => {
+      const matchDate = extractMatchDate(payment.match);
+      if (!matchDate) return false;
+      const date = new Date(matchDate);
+      return date >= startDate && date <= endDate;
+    });
+
+    // Group monthly fees theo tháng
+    const monthlyFeesByMonth = new Map<number, typeof allMonthlyFees>();
+    allMonthlyFees.forEach((fee) => {
+      if (!monthlyFeesByMonth.has(fee.month)) {
+        monthlyFeesByMonth.set(fee.month, []);
+      }
+      monthlyFeesByMonth.get(fee.month)!.push(fee);
+    });
+
+    // Group match payments theo tháng
+    const matchPaymentsByMonth = new Map<number, typeof matchPaymentsInYear>();
+    matchPaymentsInYear.forEach((payment) => {
+      const matchDate = extractMatchDate(payment.match);
+      if (matchDate) {
+        const month = new Date(matchDate).getMonth() + 1;
+        if (!matchPaymentsByMonth.has(month)) {
+          matchPaymentsByMonth.set(month, []);
+        }
+        matchPaymentsByMonth.get(month)!.push(payment);
+      }
+    });
+
+    // Lấy tất cả các tháng có dữ liệu
+    const monthsWithData = new Set<number>();
+    monthlyFeesByMonth.forEach((_, month) => monthsWithData.add(month));
+    matchPaymentsByMonth.forEach((_, month) => monthsWithData.add(month));
+
+    // Tạo response cho từng tháng
+    const months = Array.from(monthsWithData)
+      .sort((a, b) => a - b)
+      .map((month) => {
+        const monthlyFees = monthlyFeesByMonth.get(month) || [];
+        const matchPayments = matchPaymentsByMonth.get(month) || [];
+
+        // Sử dụng logic tương tự getDebtDetailsByMonth
+        const users = this.buildUserDebtDetails(
+          monthlyFees,
+          matchPayments,
+          month,
+          targetYear,
+        );
+
+        return {
+          month,
+          year: targetYear,
+          users,
+        };
+      });
+
+    return {
+      year: targetYear,
+      months,
+    };
+  }
+
+  /**
+   * Lấy chi tiết nợ của tất cả users theo tháng
+   */
+  async getDebtDetailsByMonth(
+    month?: number,
+    year?: number,
+  ): Promise<any> {
+    // Nếu không truyền month/year thì lấy tháng hiện tại
+    const now = new Date();
+    const targetMonth = month ?? now.getMonth() + 1;
+    const targetYear = year ?? now.getFullYear();
+
+    // Lấy dữ liệu từ repository
+    const { monthlyFees, matchPayments } =
+      await this.fundsRepository.getDebtDetailsByMonth(targetMonth, targetYear);
+
+    // Build user debt details
+    const users = this.buildUserDebtDetails(
+      monthlyFees,
+      matchPayments,
+      targetMonth,
+      targetYear,
+    );
+
+    return {
+      month: targetMonth,
+      year: targetYear,
+      users,
+    };
+  }
+
+  /**
+   * Helper method to build user debt details from monthly fees and match payments
+   */
+  private buildUserDebtDetails(
+    monthlyFees: MonthlyFeeDocument[],
+    matchPayments: MatchPaymentDocument[],
+    month: number,
+    year: number,
+  ): any[] {
+    // Group match payments theo userId
+    const matchPaymentsByUser = new Map<string, typeof matchPayments>();
+    matchPayments.forEach((payment) => {
+      const userId = extractUserId(payment.user);
+      if (!matchPaymentsByUser.has(userId)) {
+        matchPaymentsByUser.set(userId, []);
+      }
+      matchPaymentsByUser.get(userId)!.push(payment);
+    });
+
+    // Group monthly fees theo userId
+    const monthlyFeesByUser = new Map<string, typeof monthlyFees[0]>();
+    monthlyFees.forEach((fee) => {
+      const userId = extractUserId(fee.user);
+      monthlyFeesByUser.set(userId, fee);
+    });
+
+    // Lấy tất cả unique userIds
+    const allUserIds = new Set<string>();
+    monthlyFees.forEach((fee) => allUserIds.add(extractUserId(fee.user)));
+    matchPayments.forEach((payment) =>
+      allUserIds.add(extractUserId(payment.user)),
+    );
+
+    // Tạo response cho từng user
+    const users = Array.from(allUserIds).map((userId) => {
+      const monthlyFee = monthlyFeesByUser.get(userId);
+      const userMatchPayments = matchPaymentsByUser.get(userId) || [];
+
+      // Lấy thông tin user từ monthlyFee hoặc matchPayment đầu tiên
+      const userDoc = monthlyFee?.user || userMatchPayments[0]?.user;
+      const userName = extractUserName(userDoc) || 'Unknown';
+      const avatar =
+        userDoc && typeof userDoc === 'object' && 'avatar' in userDoc
+          ? (userDoc.avatar as string | undefined)
+          : undefined;
+      const skillLevel =
+        userDoc && typeof userDoc === 'object' && 'skillLevel' in userDoc
+          ? (userDoc.skillLevel as number)
+          : 5;
+      const isStudent =
+        userDoc && typeof userDoc === 'object' && 'isStudent' in userDoc
+          ? (userDoc.isStudent as boolean)
+          : false;
+
+      // Tính toán monthly fee
+      const monthlyFeeData = monthlyFee
+        ? {
+            amount: monthlyFee.amount,
+            isPaid: monthlyFee.isPaid,
+            paidAt: monthlyFee.paidAt,
+            dueDate: `${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}`,
+          }
+        : undefined;
+
+      // Tính toán match payments
+      const matches = userMatchPayments.map((payment) => {
+        const matchDate = extractMatchDate(payment.match);
+        const matchLocation = isPopulatedMatch(payment.match)
+          ? payment.match.location
+          : 'Unknown';
+
+        // Due date là 7 ngày sau trận đấu
+        const dueDate = matchDate
+          ? new Date(matchDate.getTime() + 7 * 24 * 60 * 60 * 1000)
+              .toISOString()
+              .split('T')[0]
+          : undefined;
+
+        return {
+          matchId: extractMatchId(payment.match),
+          date: matchDate,
+          location: matchLocation,
+          fee: payment.amount,
+          isPaid: payment.isPaid,
+          paidAt: payment.paidAt,
+          dueDate,
+        };
+      });
+
+      // Tính summary
+      const totalMatchFee = matches.reduce((sum, m) => sum + m.fee, 0);
+      const paidMatchFee = matches
+        .filter((m) => m.isPaid)
+        .reduce((sum, m) => sum + m.fee, 0);
+      const unpaidMatchFee = totalMatchFee - paidMatchFee;
+
+      const totalMonthlyFee = monthlyFeeData?.amount || 0;
+      const unpaidMonthlyFee =
+        monthlyFeeData && !monthlyFeeData.isPaid ? totalMonthlyFee : 0;
+
+      const totalDebt = unpaidMatchFee + unpaidMonthlyFee;
+
+      const summary = {
+        totalMatchFee,
+        paidMatchFee,
+        unpaidMatchFee,
+        totalMonthlyFee,
+        unpaidMonthlyFee,
+        totalDebt,
+        matchesPlayed: matches.length,
+        matchesPaid: matches.filter((m) => m.isPaid).length,
+        matchesUnpaid: matches.filter((m) => !m.isPaid).length,
+      };
+
+      return {
+        userId,
+        userName,
+        avatar,
+        skillLevel,
+        isStudent,
+        monthlyFee: monthlyFeeData,
+        matches,
+        summary,
+      };
+    });
+
+    // Sắp xếp theo tổng nợ giảm dần
+    users.sort((a, b) => b.summary.totalDebt - a.summary.totalDebt);
+
+    return users;
   }
 }

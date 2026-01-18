@@ -7,46 +7,91 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class CreateMatchPaymentDto {
+export class PlayerPaymentDto {
+  @ApiProperty({
+    description: 'User ID',
+    example: '507f1f77bcf86cd799439011',
+  })
   @IsString()
   userId: string;
 
-  @IsString()
-  matchId: string;
-
+  @ApiProperty({
+    description: 'Số tiền (VNĐ)',
+    example: 100000,
+  })
   @IsNumber()
   amount: number;
 
+  @ApiPropertyOptional({
+    description: 'Đã thanh toán chưa',
+    example: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  isPaid?: boolean;
+}
+
+export class CreateMatchPaymentDto {
+  @ApiProperty({
+    description: 'User ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @IsString()
+  userId: string;
+
+  @ApiProperty({
+    description: 'Match ID',
+    example: '507f1f77bcf86cd799439012',
+  })
+  @IsString()
+  matchId: string;
+
+  @ApiProperty({
+    description: 'Số tiền (VNĐ)',
+    example: 100000,
+  })
+  @IsNumber()
+  amount: number;
+
+  @ApiPropertyOptional({
+    description: 'Đã thanh toán chưa',
+    example: false,
+  })
   @IsBoolean()
   @IsOptional()
   isPaid?: boolean;
 
+  @ApiPropertyOptional({
+    description: 'Ghi chú',
+    example: 'Tiền thua trận',
+  })
   @IsString()
   @IsOptional()
   note?: string;
 }
 
 export class BulkCreateMatchPaymentDto {
+  @ApiProperty({
+    description: 'Match ID',
+    example: '507f1f77bcf86cd799439012',
+  })
   @IsString()
   matchId: string;
 
+  @ApiProperty({
+    description: 'Danh sách players và số tiền',
+    type: [PlayerPaymentDto],
+    example: [
+      { userId: '507f1f77bcf86cd799439011', amount: 100000, isPaid: false },
+      { userId: '507f1f77bcf86cd799439013', amount: 100000, isPaid: false },
+    ],
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => PlayerPaymentDto)
   players: PlayerPaymentDto[];
-}
-
-export class PlayerPaymentDto {
-  @IsString()
-  userId: string;
-
-  @IsNumber()
-  amount: number;
-
-  @IsBoolean()
-  @IsOptional()
-  isPaid?: boolean;
 }
 
 export class MatchPaymentResponseDto {

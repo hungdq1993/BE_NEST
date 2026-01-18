@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
@@ -9,6 +10,40 @@ async function bootstrap() {
 
   // Global prefix
   app.setGlobalPrefix('api');
+
+  // Swagger configuration
+  const config = new DocumentBuilder()
+    .setTitle('Football Team Management API')
+    .setDescription('API documentation for Football Team Management System')
+    .setVersion('1.0')
+    .addTag('auth', 'Authentication endpoints')
+    .addTag('users', 'User management endpoints')
+    .addTag('matches', 'Match management endpoints')
+    .addTag('funds', 'Fund management endpoints')
+    .addTag('votes', 'Vote management endpoints')
+    .addTag('payments', 'Payment endpoints')
+    .addTag('leaderboard', 'Leaderboard endpoints')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT token',
+        in: 'header',
+      },
+      'JWT-auth',
+    )
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      tagsSorter: 'alpha',
+      operationsSorter: 'alpha',
+    },
+  });
 
   // CORS configuration
   const frontendUrl = configService.get<string>('FRONTEND_URL');
@@ -41,5 +76,6 @@ async function bootstrap() {
   const port = configService.get<number>('PORT') || 3000;
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}/api`);
+  console.log(`Swagger documentation: http://localhost:${port}/api/docs`);
 }
 bootstrap();

@@ -20,6 +20,10 @@ import {
   ExpenseCategory,
 } from './schemas/expense.schema.js';
 import {
+  FundBalance,
+  FundBalanceDocument,
+} from './schemas/fund-balance.schema.js';
+import {
   CreateMonthlyFeeDto,
   CreatePenaltyDto,
   BulkCreateMonthlyFeeDto,
@@ -41,6 +45,8 @@ export class FundsRepository {
     private readonly matchPaymentModel: Model<MatchPaymentDocument>,
     @InjectModel(Expense.name)
     private readonly expenseModel: Model<ExpenseDocument>,
+    @InjectModel(FundBalance.name)
+    private readonly fundBalanceModel: Model<FundBalanceDocument>,
   ) {}
 
   // ==================== MATCH PAYMENT METHODS ====================
@@ -113,6 +119,41 @@ export class FundsRepository {
         { isPaid: true, paidAt: new Date() },
         { new: true },
       )
+      .exec();
+  }
+
+  // Đánh dấu đã thanh toán match payments hàng loạt theo userIds
+  async bulkMarkMatchPaymentPaid(
+    userIds: string[],
+    matchId?: string,
+  ): Promise<MatchPaymentDocument[]> {
+    const now = new Date();
+    const filter: Record<string, unknown> = {
+      user: { $in: userIds.map((id) => new Types.ObjectId(id)) },
+      isPaid: false,
+    };
+
+    // Nếu có matchId thì chỉ thanh toán cho trận đó
+    if (matchId) {
+      filter.match = new Types.ObjectId(matchId);
+    }
+
+    await this.matchPaymentModel.updateMany(filter, {
+      $set: { isPaid: true, paidAt: now },
+    });
+
+    // Trả về tất cả payments của users (đã update)
+    const resultFilter: Record<string, unknown> = {
+      user: { $in: userIds.map((id) => new Types.ObjectId(id)) },
+    };
+    if (matchId) {
+      resultFilter.match = new Types.ObjectId(matchId);
+    }
+
+    return this.matchPaymentModel
+      .find(resultFilter)
+      .populate('user', 'name email')
+      .populate('match', 'matchDate location')
       .exec();
   }
 
@@ -287,18 +328,19 @@ export class FundsRepository {
 
   async bulkCreateMonthlyFees(
     dto: BulkCreateMonthlyFeeDto,
-    userIds: string[],
+    users: Array<{ userId: string; isStudent: boolean }>,
+    studentAmount: number,
   ): Promise<MonthlyFeeDocument[]> {
-    if (userIds.length === 0) {
+    if (users.length === 0) {
       return [];
     }
 
-    // Tạo array fees cho tất cả users
-    const feesToCreate = userIds.map((userId) => ({
-      user: new Types.ObjectId(userId),
+    // Tạo array fees cho tất cả users với số tiền tương ứng
+    const feesToCreate = users.map((user) => ({
+      user: new Types.ObjectId(user.userId),
       month: dto.month,
       year: dto.year,
-      amount: dto.amount,
+      amount: user.isStudent ? studentAmount : dto.amount,
       note: dto.note,
     }));
 
@@ -381,6 +423,14 @@ export class FundsRepository {
       .exec();
   }
 
+  async findMonthlyFeesByYear(year: number): Promise<MonthlyFeeDocument[]> {
+    return this.monthlyFeeModel
+      .find({ year })
+      .populate('user', 'name email avatar skillLevel isStudent')
+      .sort({ month: 1 })
+      .exec();
+  }
+
   async markMonthlyFeePaid(id: string): Promise<MonthlyFeeDocument | null> {
     return this.monthlyFeeModel
       .findByIdAndUpdate(
@@ -388,6 +438,35 @@ export class FundsRepository {
         { isPaid: true, paidAt: new Date() },
         { new: true },
       )
+      .populate('user', 'name email')
+      .exec();
+  }
+
+  // Đánh dấu đã thanh toán hàng loạt theo userIds và period
+  async bulkMarkMonthlyFeePaid(
+    userIds: string[],
+    month: number,
+    year: number,
+  ): Promise<MonthlyFeeDocument[]> {
+    const now = new Date();
+    await this.monthlyFeeModel.updateMany(
+      {
+        user: { $in: userIds.map((id) => new Types.ObjectId(id)) },
+        month,
+        year,
+        isPaid: false,
+      },
+      {
+        $set: { isPaid: true, paidAt: now },
+      },
+    );
+
+    return this.monthlyFeeModel
+      .find({
+        user: { $in: userIds.map((id) => new Types.ObjectId(id)) },
+        month,
+        year,
+      })
       .populate('user', 'name email')
       .exec();
   }
@@ -639,6 +718,9 @@ export class FundsRepository {
     totalIncome: number;
     totalExpense: number;
     balance: number;
+    totalPending: number;
+    manualBalance: number | null;
+    manualBalanceSetAt: Date | null;
     incomeBreakdown: {
       matchPayments: number;
       monthlyFees: number;
@@ -650,28 +732,99 @@ export class FundsRepository {
       equipment: number;
       other: number;
     };
+    pendingBreakdown: {
+      matchPayments: number;
+      monthlyFees: number;
+      penalties: number;
+    };
   }> {
+    // 1. Lấy manual fund balance (nếu có)
+    const manualFundBalance = await this.fundBalanceModel
+      .findOne()
+      .sort({ createdAt: -1 })
+      .limit(1);
+
+    const manualBalance = manualFundBalance?.amount ?? null;
+    const manualBalanceSetAt = manualFundBalance?.createdAt ?? null;
+
+    // 2. Tạo date filter
+    // Đối với thu nhập: filter theo paidAt/updatedAt (thời điểm đóng tiền)
+    // Đối với chi phí: filter theo createdAt (thời điểm tạo expense)
+    const incomeFilter = manualBalanceSetAt 
+      ? { 
+          isPaid: true,
+          $or: [
+            { paidAt: { $gte: manualBalanceSetAt } },
+            { 
+              paidAt: { $exists: false },
+              updatedAt: { $gte: manualBalanceSetAt }
+            }
+          ]
+        }
+      : { isPaid: true };
+
+    const expenseFilter = manualBalanceSetAt 
+      ? { createdAt: { $gte: manualBalanceSetAt } }
+      : {};
+
+    // 3. Tính tổng thu/chi
     const [matchPaymentStats, monthlyFeeStats, penaltyStats, expenseStats] =
       await Promise.all([
-        this.getMatchPaymentStats(),
+        // Match payments (filter theo thời điểm đóng)
+        this.matchPaymentModel.aggregate<{ total: number }>([
+          { $match: incomeFilter },
+          { $group: { _id: null, total: { $sum: '$amount' } } },
+        ]),
+        // Monthly fees (filter theo thời điểm đóng)
         this.monthlyFeeModel.aggregate<{ total: number }>([
-          { $match: { isPaid: true } },
+          { $match: incomeFilter },
           { $group: { _id: null, total: { $sum: '$amount' } } },
         ]),
+        // Penalties (filter theo thời điểm đóng)
         this.penaltyModel.aggregate<{ total: number }>([
-          { $match: { isPaid: true } },
+          { $match: incomeFilter },
           { $group: { _id: null, total: { $sum: '$amount' } } },
         ]),
-        this.getExpenseStats(),
+        // Expenses (filter theo thời điểm tạo)
+        this.expenseModel.aggregate([
+          { $match: expenseFilter },
+          {
+            $group: {
+              _id: null,
+              total: { $sum: '$amount' },
+            },
+          },
+        ]),
       ]);
 
-    const matchPaymentsIncome = matchPaymentStats.paid;
-    const monthlyFeesIncome =
-      (monthlyFeeStats[0]?.total as number | undefined) ?? 0;
+    const matchPaymentsIncome = (matchPaymentStats[0]?.total as number | undefined) ?? 0;
+    const monthlyFeesIncome = (monthlyFeeStats[0]?.total as number | undefined) ?? 0;
     const penaltiesIncome = (penaltyStats[0]?.total as number | undefined) ?? 0;
-    const totalIncome =
-      matchPaymentsIncome + monthlyFeesIncome + penaltiesIncome;
-    const totalExpense = expenseStats.total;
+    const totalIncome = matchPaymentsIncome + monthlyFeesIncome + penaltiesIncome;
+    
+    const totalExpense = (expenseStats[0]?.total as number | undefined) ?? 0;
+
+    // 4. Tính balance
+    let balance: number;
+    
+    if (manualBalance !== null) {
+      // Có manual balance: cộng thêm thu/chi sau thời điểm set
+      balance = manualBalance + totalIncome - totalExpense;
+    } else {
+      // Không có manual balance: tính từ đầu
+      balance = totalIncome - totalExpense;
+    }
+
+    // 5. Tính expense breakdown (filter theo createdAt)
+    const expenseBreakdownStats = await this.expenseModel.aggregate([
+      { $match: expenseFilter },
+      {
+        $group: {
+          _id: '$category',
+          amount: { $sum: '$amount' },
+        },
+      },
+    ]);
 
     const expenseBreakdown = {
       fieldRental: 0,
@@ -679,8 +832,9 @@ export class FundsRepository {
       equipment: 0,
       other: 0,
     };
-    expenseStats.byCategory.forEach((item) => {
-      const category = item.category as ExpenseCategory;
+
+    expenseBreakdownStats.forEach((item) => {
+      const category = item._id as ExpenseCategory;
       switch (category) {
         case ExpenseCategory.FIELD_RENTAL:
           expenseBreakdown.fieldRental = item.amount;
@@ -696,16 +850,123 @@ export class FundsRepository {
       }
     });
 
+    // 6. Tính tổng nợ nhóm (tổng số tiền các thành viên chưa đóng)
+    const [unpaidMatchPayments, unpaidMonthlyFees, unpaidPenalties] = await Promise.all([
+      this.matchPaymentModel.aggregate<{ total: number }>([
+        { $match: { isPaid: false } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]),
+      this.monthlyFeeModel.aggregate<{ total: number }>([
+        { $match: { isPaid: false } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]),
+      this.penaltyModel.aggregate<{ total: number }>([
+        { $match: { isPaid: false } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]),
+    ]);
+
+    const pendingMatchPayments = (unpaidMatchPayments[0]?.total as number | undefined) ?? 0;
+    const pendingMonthlyFees = (unpaidMonthlyFees[0]?.total as number | undefined) ?? 0;
+    const pendingPenalties = (unpaidPenalties[0]?.total as number | undefined) ?? 0;
+    const totalPending = pendingMatchPayments + pendingMonthlyFees + pendingPenalties;
+
     return {
       totalIncome,
       totalExpense,
-      balance: totalIncome - totalExpense,
+      balance,
+      totalPending,
+      manualBalance,
+      manualBalanceSetAt,
       incomeBreakdown: {
         matchPayments: matchPaymentsIncome,
         monthlyFees: monthlyFeesIncome,
         penalties: penaltiesIncome,
       },
       expenseBreakdown,
+      pendingBreakdown: {
+        matchPayments: pendingMatchPayments,
+        monthlyFees: pendingMonthlyFees,
+        penalties: pendingPenalties,
+      },
     };
+  }
+
+  // ==================== FUND BALANCE METHODS ====================
+
+  /**
+   * Create a new fund balance record
+   * @param amount - The fund balance amount (can be positive or negative)
+   * @param setBy - The admin user ID who set the balance
+   * @param note - Optional note about the balance
+   * @returns The created fund balance document
+   */
+  async createFundBalance(
+    amount: number,
+    setBy: string,
+    note?: string,
+  ): Promise<FundBalanceDocument> {
+    try {
+      const balance = new this.fundBalanceModel({
+        amount,
+        setBy: new Types.ObjectId(setBy),
+        note,
+      });
+      return await balance.save();
+    } catch (error) {
+      throw new Error(`Failed to create fund balance: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get the current (most recent) fund balance
+   * @returns The most recent fund balance document or null if none exists
+   */
+  async getCurrentFundBalance(): Promise<FundBalanceDocument | null> {
+    return this.fundBalanceModel
+      .findOne()
+      .sort({ createdAt: -1 })
+      .limit(1)
+      .populate('setBy', 'name email')
+      .exec();
+  }
+
+  // Lấy chi tiết nợ của tất cả users theo tháng
+  async getDebtDetailsByMonth(
+    month: number,
+    year: number,
+  ): Promise<{
+    monthlyFees: MonthlyFeeDocument[];
+    matchPayments: MatchPaymentDocument[];
+  }> {
+    // Lấy tất cả monthly fees của tháng này
+    const monthlyFees = await this.monthlyFeeModel
+      .find({ month, year })
+      .populate('user', 'name email avatar skillLevel isStudent')
+      .exec();
+
+    // Lấy tất cả match payments trong tháng này
+    // Tìm các trận có matchDate trong tháng
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    // Lấy tất cả match payments có match.matchDate trong khoảng thời gian
+    const matchPayments = await this.matchPaymentModel
+      .find()
+      .populate('user', 'name email avatar skillLevel isStudent')
+      .populate('match', 'matchDate location')
+      .exec();
+
+    // Filter theo matchDate sau khi populate
+    const filteredPayments = matchPayments.filter((payment) => {
+      if (!payment.match || typeof payment.match !== 'object') return false;
+      const match = payment.match as any;
+      const matchDate = match.matchDate;
+      if (!matchDate) return false;
+      const date = new Date(matchDate);
+      return date >= startDate && date <= endDate;
+    });
+
+    return { monthlyFees, matchPayments: filteredPayments };
   }
 }

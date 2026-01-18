@@ -2,3 +2,6 @@ export * from './fund-stats.dto.js';
 export * from './penalty-summary.dto.js';
 export * from './match-payment.dto.js';
 export * from './expense.dto.js';
+export * from './bulk-mark-paid.dto.js';
+export * from './bulk-mark-match-payment-paid.dto.js';
+export * from './debt-details.dto.js';

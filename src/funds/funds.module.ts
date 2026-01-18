@@ -10,6 +10,7 @@ import {
   MatchPaymentSchema,
 } from './schemas/match-payment.schema.js';
 import { Expense, ExpenseSchema } from './schemas/expense.schema.js';
+import { FundBalance, FundBalanceSchema } from './schemas/fund-balance.schema.js';
 import { MatchesModule } from '../matches/matches.module.js';
 import { UsersModule } from '../users/users.module.js';
 
@@ -20,6 +21,7 @@ import { UsersModule } from '../users/users.module.js';
       { name: Penalty.name, schema: PenaltySchema },
       { name: MatchPayment.name, schema: MatchPaymentSchema },
       { name: Expense.name, schema: ExpenseSchema },
+      { name: FundBalance.name, schema: FundBalanceSchema },
     ]),
     forwardRef(() => MatchesModule),
     forwardRef(() => UsersModule),
